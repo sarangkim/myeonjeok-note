@@ -253,7 +253,6 @@ async function fetchBldItems(apiName, keys) {
 
   while (pageNo <= MAX_PAGES) {
     const url = new URL(`https://apis.data.go.kr/1613000/BldRgstHubService/${apiName}`);
-    url.searchParams.set("serviceKey", process.env.BLD_KEY);
     url.searchParams.set("sigunguCd", keys.sigunguCd);
     url.searchParams.set("bjdongCd", keys.bjdongCd);
     url.searchParams.set("bun", keys.bun);
@@ -261,7 +260,7 @@ async function fetchBldItems(apiName, keys) {
     url.searchParams.set("numOfRows", String(BLD_PAGE_SIZE));
     url.searchParams.set("pageNo", String(pageNo));
 
-    const response = await fetch(url.toString());
+    const response = await fetch(withServiceKey(url, process.env.BLD_KEY));
     if (!response.ok) throw new Error(`${apiName} HTTP 오류: ${response.status}`);
 
     const xml = await response.text();
@@ -277,6 +276,18 @@ async function fetchBldItems(apiName, keys) {
   }
 
   return allItems;
+}
+
+function withServiceKey(url, serviceKey) {
+  const rawKey = String(serviceKey || "").trim();
+  const glue = url.search ? "&" : "?";
+
+  if (rawKey.includes("%")) {
+    return `${url.toString()}${glue}serviceKey=${rawKey}`;
+  }
+
+  url.searchParams.set("serviceKey", rawKey);
+  return url.toString();
 }
 
 function assertApiOk(xmlText, apiName) {
