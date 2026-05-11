@@ -443,6 +443,35 @@
       padding: 12px;
     }
 
+    .map-card {
+      display: grid;
+      gap: 10px;
+    }
+
+    .map-canvas {
+      width: 100%;
+      min-height: 260px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--soft);
+      overflow: hidden;
+    }
+
+    .map-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .map-link {
+      color: var(--brand-strong);
+      font-size: 13px;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
     @media (max-width: 860px) {
       .topbar,
       .actions {
@@ -564,7 +593,11 @@
         prefetch: null,
         recent: [],
         currentResult: null,
-        currentNote: null
+        currentNote: null,
+        config: null,
+        kakaoLoading: null,
+        map: null,
+        marker: null
       };
 
       form.addEventListener("submit", function (event) {
@@ -641,6 +674,7 @@
           renderSummary(data);
           remember(data, "층 목록");
           setCurrentResult(data);
+          renderMap(data);
           setStatus("층 목록을 불러왔습니다.");
         } catch (error) {
           setStatus(error.message, "error");
@@ -657,6 +691,7 @@
           renderFloor(data);
           remember(data, "층");
           setCurrentResult(data);
+          renderMap(data);
           setStatus("층 정보를 불러왔습니다.");
         } catch (error) {
           setStatus(error.message, "error");
@@ -691,6 +726,7 @@
           else renderFallback(data);
           remember(data, ho ? "호" : "층");
           setCurrentResult(data);
+          renderMap(data);
           setStatus("조회가 완료되었습니다.");
         } catch (error) {
           setStatus(error.message, "error");
@@ -869,7 +905,23 @@
           '<section class="section"><h2 class="section-title">주소</h2><div class="meta-grid">',
           box("도로명", data.road || "-"),
           box("지번", data.jibun || "-"),
-          '</div></section>'
+          '</div></section>',
+          renderMapShell(data)
+        ].join("");
+      }
+
+      function renderMapShell(data) {
+        var address = data.road || data.jibun || data.address || "";
+        if (!address || address === "-") return "";
+        return [
+          '<section class="section map-card">',
+          '<h2 class="section-title">지도</h2>',
+          '<div class="map-canvas" id="kakaoMap"></div>',
+          '<div class="map-actions">',
+          '<div class="note" id="mapStatus">지도를 준비하는 중입니다.</div>',
+          '<a class="map-link" target="_blank" rel="noopener" href="' + escAttr(kakaoSearchUrl(address)) + '">카카오맵에서 보기</a>',
+          '</div>',
+          '</section>'
         ].join("");
       }
 
@@ -998,6 +1050,7 @@
           notePasswordInput.hidden = !protectNoteInput.checked;
           renderSharedNote(note);
           showShareLink(id);
+          renderMap(note);
           setStatus("공유 메모를 불러왔습니다.");
         } catch (error) {
           setStatus(error.message, "error");
@@ -1130,6 +1183,7 @@
           notePasswordInput.hidden = !protectNoteInput.checked;
           renderSharedNote(note);
           showShareLink(id);
+          renderMap(note);
           setStatus("공유 메모를 열었습니다.");
         } catch (error) {
           setStatus(error.message, "error");
@@ -1141,6 +1195,71 @@
         noteList.innerHTML = state.recent.map(function (item) {
           return '<li class="note-card"><strong>' + esc(item.title) + '</strong><span>' + esc(item.road || item.address) + (item.total ? " · " + item.total : "") + '</span></li>';
         }).join("");
+      }
+
+      async function getConfig() {
+        if (state.config) return state.config;
+        var response = await fetch("/api/config");
+        var data = await response.json().catch(function () { return {}; });
+        state.config = data || {};
+        return state.config;
+      }
+
+      async function loadKakaoMaps() {
+        if (window.kakao && window.kakao.maps && window.kakao.maps.services) return true;
+        if (state.kakaoLoading) return state.kakaoLoading;
+
+        state.kakaoLoading = getConfig().then(function (config) {
+          if (!config.kakaoMapJsKey) return false;
+
+          return new Promise(function (resolve) {
+            var script = document.createElement("script");
+            script.src = "https://dapi.kakao.com/v2/maps/sdk.js?appkey=" + encodeURIComponent(config.kakaoMapJsKey) + "&libraries=services&autoload=false";
+            script.onload = function () {
+              window.kakao.maps.load(function () { resolve(true); });
+            };
+            script.onerror = function () { resolve(false); };
+            document.head.appendChild(script);
+          });
+        });
+
+        return state.kakaoLoading;
+      }
+
+      async function renderMap(data) {
+        var mapEl = document.getElementById("kakaoMap");
+        var status = document.getElementById("mapStatus");
+        if (!mapEl) return;
+
+        var address = data.road || data.jibun || data.address || "";
+        if (!address) {
+          if (status) status.textContent = "표시할 주소가 없습니다.";
+          return;
+        }
+
+        var ready = await loadKakaoMaps();
+        if (!ready) {
+          if (status) status.textContent = "카카오맵 키를 설정하면 앱 안에서 지도를 볼 수 있습니다.";
+          return;
+        }
+
+        var geocoder = new window.kakao.maps.services.Geocoder();
+        geocoder.addressSearch(address, function (result, stateCode) {
+          if (stateCode !== window.kakao.maps.services.Status.OK || !result.length) {
+            if (status) status.textContent = "주소 좌표를 찾지 못했습니다.";
+            return;
+          }
+
+          var coords = new window.kakao.maps.LatLng(Number(result[0].y), Number(result[0].x));
+          state.map = new window.kakao.maps.Map(mapEl, { center: coords, level: 3 });
+          state.marker = new window.kakao.maps.Marker({ map: state.map, position: coords });
+          new window.kakao.maps.InfoWindow({ content: '<div style="padding:6px 8px;font-size:12px;white-space:nowrap;">' + esc(address) + '</div>' }).open(state.map, state.marker);
+          if (status) status.textContent = address;
+        });
+      }
+
+      function kakaoSearchUrl(address) {
+        return "https://map.kakao.com/link/search/" + encodeURIComponent(address || "");
       }
 
       function buildHoIndex(exposItems, pubItems, floor) {
