@@ -8,9 +8,16 @@ create table if not exists public.area_notes (
   ho text not null default '',
   memo text not null default '',
   result jsonb,
+  has_password boolean not null default false,
+  password_hash text,
+  password_salt text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.area_notes add column if not exists has_password boolean not null default false;
+alter table public.area_notes add column if not exists password_hash text;
+alter table public.area_notes add column if not exists password_salt text;
 
 create index if not exists area_notes_created_at_idx on public.area_notes (created_at desc);
 

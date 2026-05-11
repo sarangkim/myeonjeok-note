@@ -419,6 +419,30 @@
       overflow-wrap: anywhere;
     }
 
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .check-row input {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--brand);
+    }
+
+    .password-panel {
+      display: grid;
+      gap: 8px;
+      border: 1px solid #d8c8b5;
+      border-radius: 6px;
+      background: #fff8ed;
+      padding: 12px;
+    }
+
     @media (max-width: 860px) {
       .topbar,
       .actions {
@@ -492,6 +516,11 @@
         <h2>공유 메모</h2>
         <div class="memo-box">
           <textarea id="memo" placeholder="조회한 면적에 대한 메모를 적어두세요."></textarea>
+          <label class="check-row">
+            <input id="protectNote" type="checkbox">
+            비밀번호로 보호
+          </label>
+          <input id="notePassword" type="password" placeholder="공유 링크 열람 비밀번호" hidden>
           <div class="button-row">
             <button id="saveNoteBtn" type="button">메모 저장</button>
             <button class="secondary" id="copyLinkBtn" type="button">링크 복사</button>
@@ -526,6 +555,8 @@
       var saveNoteBtn = document.getElementById("saveNoteBtn");
       var copyLinkBtn = document.getElementById("copyLinkBtn");
       var shareBox = document.getElementById("shareBox");
+      var protectNoteInput = document.getElementById("protectNote");
+      var notePasswordInput = document.getElementById("notePassword");
 
       var state = {
         floors: [],
@@ -562,6 +593,10 @@
 
       saveNoteBtn.addEventListener("click", saveSharedNote);
       copyLinkBtn.addEventListener("click", copyShareLink);
+      protectNoteInput.addEventListener("change", function () {
+        notePasswordInput.hidden = !protectNoteInput.checked;
+        if (!protectNoteInput.checked) notePasswordInput.value = "";
+      });
 
       loadSharedNoteFromUrl();
 
@@ -945,12 +980,22 @@
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "공유 메모를 불러오지 못했습니다.");
 
+          if (data.password_required) {
+            state.currentNote = data.note;
+            renderLockedNote(data.note);
+            showShareLink(id);
+            setStatus("비밀번호가 필요한 메모입니다.");
+            return;
+          }
+
           var note = data.note;
           state.currentNote = note;
           state.currentResult = note.result || null;
           addressInput.value = note.address || note.road || "";
           hoInput.value = note.ho || "";
           memoInput.value = note.memo || "";
+          protectNoteInput.checked = !!note.has_password;
+          notePasswordInput.hidden = !protectNoteInput.checked;
           renderSharedNote(note);
           showShareLink(id);
           setStatus("공유 메모를 불러왔습니다.");
@@ -978,7 +1023,8 @@
           floor: input.floor || floorSelect.value || "",
           ho: input.ho || hoInput.value.trim() || "",
           memo: memoInput.value,
-          result: result
+          result: result,
+          password: protectNoteInput.checked ? notePasswordInput.value : ""
         };
 
         setStatus("메모를 저장하는 중입니다.");
@@ -1043,6 +1089,51 @@
         }
         parts.push('<section class="section"><h2 class="section-title">메모</h2><div class="note">' + esc(note.memo || "저장된 메모가 없습니다.") + '</div></section>');
         resultsEl.innerHTML = parts.join("");
+      }
+
+      function renderLockedNote(note) {
+        resultsEl.innerHTML = [
+          '<section class="section password-panel">',
+          '<h2 class="section-title">비밀번호가 필요한 메모</h2>',
+          '<div class="note">공유받은 비밀번호를 입력하면 저장된 면적과 메모를 볼 수 있습니다.</div>',
+          '<input id="unlockPassword" type="password" placeholder="비밀번호">',
+          '<button id="unlockBtn" type="button">열람하기</button>',
+          '</section>'
+        ].join("");
+
+        document.getElementById("unlockBtn").addEventListener("click", function () {
+          unlockSharedNote(note.id, document.getElementById("unlockPassword").value);
+        });
+      }
+
+      async function unlockSharedNote(id, password) {
+        if (!password) {
+          setStatus("비밀번호를 입력해주세요.", "error");
+          return;
+        }
+
+        setStatus("비밀번호를 확인하는 중입니다.");
+        try {
+          var response = await fetch("/api/notes?id=" + encodeURIComponent(id) + "&password=" + encodeURIComponent(password));
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "메모를 열지 못했습니다.");
+          if (data.password_required) {
+            setStatus("비밀번호가 맞지 않습니다.", "error");
+            return;
+          }
+
+          var note = data.note;
+          state.currentNote = note;
+          state.currentResult = note.result || null;
+          memoInput.value = note.memo || "";
+          protectNoteInput.checked = !!note.has_password;
+          notePasswordInput.hidden = !protectNoteInput.checked;
+          renderSharedNote(note);
+          showShareLink(id);
+          setStatus("공유 메모를 열었습니다.");
+        } catch (error) {
+          setStatus(error.message, "error");
+        }
       }
 
       function renderRecent() {
