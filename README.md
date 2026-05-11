@@ -6,6 +6,8 @@
 
 - `JUSO_KEY`: 도로명주소 API 승인키
 - `BLD_KEY`: 건축물대장 API 서비스키
+- `SUPABASE_URL`: Supabase 프로젝트 URL
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service_role 키
 
 ## 로컬 실행
 
@@ -17,3 +19,7 @@ npm run dev
 ## 배포
 
 새 GitHub 저장소와 새 Vercel 프로젝트에 연결해서 배포하세요. 기존 `sarangkim/area-checker-v2` 저장소나 기존 Vercel 프로젝트와 연결하지 마세요.
+
+## Supabase 메모 저장
+
+Supabase SQL Editor에서 `supabase-schema.sql`을 한 번 실행한 뒤, Vercel 환경변수에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`를 추가하세요. 공유 메모는 로그인 없이 보기 링크로 열람되고, 수정 권한은 작성 브라우저에 저장되는 수정 토큰으로 처리됩니다.

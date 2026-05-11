@@ -384,6 +384,41 @@
       font-size: 12px;
     }
 
+    .memo-box {
+      display: grid;
+      gap: 8px;
+    }
+
+    .memo-box textarea {
+      width: 100%;
+      min-height: 120px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      font: 14px var(--font);
+      line-height: 1.5;
+      padding: 10px;
+      outline: none;
+    }
+
+    .memo-box textarea:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(30, 111, 92, 0.16);
+    }
+
+    .share-output {
+      display: grid;
+      gap: 6px;
+      border: 1px solid #d8c8b5;
+      border-radius: 6px;
+      background: #fff8ed;
+      color: #6d431d;
+      font-size: 12px;
+      padding: 9px;
+      overflow-wrap: anywhere;
+    }
+
     @media (max-width: 860px) {
       .topbar,
       .actions {
@@ -454,6 +489,15 @@
     <div class="workspace">
       <main class="results" id="results"></main>
       <aside class="note-panel">
+        <h2>공유 메모</h2>
+        <div class="memo-box">
+          <textarea id="memo" placeholder="조회한 면적에 대한 메모를 적어두세요."></textarea>
+          <div class="button-row">
+            <button id="saveNoteBtn" type="button">메모 저장</button>
+            <button class="secondary" id="copyLinkBtn" type="button">링크 복사</button>
+          </div>
+          <div class="share-output" id="shareBox" hidden></div>
+        </div>
         <h2>최근 조회</h2>
         <ul class="note-list" id="noteList"></ul>
         <div class="note" id="emptyNote">아직 저장된 조회가 없습니다.</div>
@@ -478,12 +522,18 @@
       var resultsEl = document.getElementById("results");
       var noteList = document.getElementById("noteList");
       var emptyNote = document.getElementById("emptyNote");
+      var memoInput = document.getElementById("memo");
+      var saveNoteBtn = document.getElementById("saveNoteBtn");
+      var copyLinkBtn = document.getElementById("copyLinkBtn");
+      var shareBox = document.getElementById("shareBox");
 
       var state = {
         floors: [],
         lastAddress: "",
         prefetch: null,
-        recent: []
+        recent: [],
+        currentResult: null,
+        currentNote: null
       };
 
       form.addEventListener("submit", function (event) {
@@ -509,6 +559,11 @@
           loadFloor(floorSelect.value);
         }
       });
+
+      saveNoteBtn.addEventListener("click", saveSharedNote);
+      copyLinkBtn.addEventListener("click", copyShareLink);
+
+      loadSharedNoteFromUrl();
 
       async function requestArea(params) {
         setBusy(true);
@@ -550,6 +605,7 @@
           setFloors(data.floors || []);
           renderSummary(data);
           remember(data, "층 목록");
+          setCurrentResult(data);
           setStatus("층 목록을 불러왔습니다.");
         } catch (error) {
           setStatus(error.message, "error");
@@ -565,6 +621,7 @@
           var data = hasPrefetch(address) ? buildFloorFromPrefetch(floor) : await requestArea({ address: address, floor: floor });
           renderFloor(data);
           remember(data, "층");
+          setCurrentResult(data);
           setStatus("층 정보를 불러왔습니다.");
         } catch (error) {
           setStatus(error.message, "error");
@@ -598,6 +655,7 @@
           else if (data.mode === "ho_breakdown") renderHoBreakdown(data);
           else renderFallback(data);
           remember(data, ho ? "호" : "층");
+          setCurrentResult(data);
           setStatus("조회가 완료되었습니다.");
         } catch (error) {
           setStatus(error.message, "error");
@@ -875,6 +933,116 @@
         };
         state.recent = [item].concat(state.recent).slice(0, 5);
         renderRecent();
+      }
+
+      async function loadSharedNoteFromUrl() {
+        var id = new URLSearchParams(window.location.search).get("note");
+        if (!id) return;
+
+        setStatus("공유 메모를 불러오는 중입니다.");
+        try {
+          var response = await fetch("/api/notes?id=" + encodeURIComponent(id));
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "공유 메모를 불러오지 못했습니다.");
+
+          var note = data.note;
+          state.currentNote = note;
+          state.currentResult = note.result || null;
+          addressInput.value = note.address || note.road || "";
+          hoInput.value = note.ho || "";
+          memoInput.value = note.memo || "";
+          renderSharedNote(note);
+          showShareLink(id);
+          setStatus("공유 메모를 불러왔습니다.");
+        } catch (error) {
+          setStatus(error.message, "error");
+        }
+      }
+
+      async function saveSharedNote() {
+        if (!state.currentResult) {
+          setStatus("먼저 주소나 호를 조회해주세요.", "error");
+          return;
+        }
+
+        var result = state.currentResult || {};
+        var input = result.input || {};
+        var id = state.currentNote && state.currentNote.id;
+        var editToken = id ? localStorage.getItem("myeonjeok_note_edit_" + id) : "";
+        var payload = {
+          id: id,
+          edit_token: editToken,
+          address: input.address || addressInput.value.trim(),
+          road: result.road || "",
+          jibun: result.jibun || "",
+          floor: input.floor || floorSelect.value || "",
+          ho: input.ho || hoInput.value.trim() || "",
+          memo: memoInput.value,
+          result: result
+        };
+
+        setStatus("메모를 저장하는 중입니다.");
+        try {
+          var response = await fetch("/api/notes", {
+            method: id && editToken ? "PATCH" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "메모 저장에 실패했습니다.");
+
+          state.currentNote = data.note;
+          if (data.edit_token) localStorage.setItem("myeonjeok_note_edit_" + data.note.id, data.edit_token);
+          showShareLink(data.note.id);
+          setStatus("메모를 저장했습니다.");
+        } catch (error) {
+          setStatus(error.message, "error");
+        }
+      }
+
+      async function copyShareLink() {
+        if (!state.currentNote || !state.currentNote.id) {
+          setStatus("복사할 공유 링크가 없습니다.", "error");
+          return;
+        }
+
+        var link = shareLink(state.currentNote.id);
+        try {
+          await navigator.clipboard.writeText(link);
+          setStatus("공유 링크를 복사했습니다.");
+        } catch {
+          showShareLink(state.currentNote.id);
+          setStatus("아래 공유 링크를 직접 복사해주세요.", "warn");
+        }
+      }
+
+      function setCurrentResult(data) {
+        state.currentResult = data;
+        state.currentNote = null;
+        shareBox.hidden = true;
+        shareBox.textContent = "";
+      }
+
+      function showShareLink(id) {
+        shareBox.hidden = false;
+        shareBox.textContent = shareLink(id);
+      }
+
+      function shareLink(id) {
+        return window.location.origin + window.location.pathname + "?note=" + encodeURIComponent(id);
+      }
+
+      function renderSharedNote(note) {
+        var result = note.result || {};
+        var parts = [renderAddress(note)];
+        if (result.sum) {
+          parts.push('<section class="section"><h2 class="section-title">저장된 면적</h2>' + renderSum(result.sum) + '</section>');
+        }
+        if (Array.isArray(result.breakdown)) {
+          parts.push('<section class="section"><h2 class="section-title">저장된 breakdown</h2>' + renderBreakdown(result.breakdown) + '</section>');
+        }
+        parts.push('<section class="section"><h2 class="section-title">메모</h2><div class="note">' + esc(note.memo || "저장된 메모가 없습니다.") + '</div></section>');
+        resultsEl.innerHTML = parts.join("");
       }
 
       function renderRecent() {
