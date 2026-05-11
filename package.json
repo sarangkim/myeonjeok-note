@@ -1,0 +1,16 @@
+{
+  "name": "myeonjeok-note",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Address, floor, and unit area lookup note app for Vercel.",
+  "scripts": {
+    "dev": "vercel dev",
+    "check": "node --check api/area.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "vercel": "^37.0.0"
+  }
+}
