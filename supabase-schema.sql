@@ -11,6 +11,7 @@ create table if not exists public.area_notes (
   has_password boolean not null default false,
   password_hash text,
   password_salt text,
+  owner_user_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -18,7 +19,9 @@ create table if not exists public.area_notes (
 alter table public.area_notes add column if not exists has_password boolean not null default false;
 alter table public.area_notes add column if not exists password_hash text;
 alter table public.area_notes add column if not exists password_salt text;
+alter table public.area_notes add column if not exists owner_user_id uuid;
 
 create index if not exists area_notes_created_at_idx on public.area_notes (created_at desc);
+create index if not exists area_notes_owner_user_id_idx on public.area_notes (owner_user_id, updated_at desc);
 
 alter table public.area_notes enable row level security;

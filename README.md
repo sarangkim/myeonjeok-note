@@ -7,6 +7,7 @@
 - `JUSO_KEY`: 도로명주소 API 승인키
 - `BLD_KEY`: 건축물대장 API 서비스키
 - `SUPABASE_URL`: Supabase 프로젝트 URL
+- `SUPABASE_ANON_KEY`: Supabase anon public 키
 - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service_role 키
 - `KAKAO_MAP_JS_KEY`: Kakao Developers JavaScript 키
 

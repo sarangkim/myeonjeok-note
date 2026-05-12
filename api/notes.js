@@ -2,6 +2,7 @@ const crypto = require("crypto");
 
 const TABLE = "area_notes";
 const PUBLIC_COLUMNS = "id,address,road,jibun,floor,ho,memo,result,has_password,created_at,updated_at";
+const PRIVATE_COLUMNS = `${PUBLIC_COLUMNS},owner_user_id,password_hash,password_salt`;
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -14,18 +15,30 @@ module.exports = async (req, res) => {
     assertSupabaseEnv();
 
     if (req.method === "GET") {
+      const user = await getAuthUser(req);
+      if (String(req.query.mine || "") === "1") {
+        if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+
+        const rows = await supabaseRequest(`${TABLE}?owner_user_id=eq.${encodeURIComponent(user.id)}&select=${PUBLIC_COLUMNS}&order=updated_at.desc&limit=100`, {
+          method: "GET",
+        });
+
+        return res.status(200).json({ ok: true, notes: rows });
+      }
+
       const id = cleanId(req.query.id);
       if (!id) return res.status(400).json({ ok: false, message: "id is required." });
 
       const password = String(req.query.password || "");
-      const rows = await supabaseRequest(`${TABLE}?id=eq.${encodeURIComponent(id)}&select=${PUBLIC_COLUMNS},password_hash,password_salt`, {
+      const rows = await supabaseRequest(`${TABLE}?id=eq.${encodeURIComponent(id)}&select=${PRIVATE_COLUMNS}`, {
         method: "GET",
       });
 
       if (!rows.length) return res.status(404).json({ ok: false, message: "Note not found." });
 
       const row = rows[0];
-      if (row.has_password && !verifyPassword(password, row.password_salt, row.password_hash)) {
+      const isOwner = user && row.owner_user_id && String(row.owner_user_id) === String(user.id);
+      if (row.has_password && !isOwner && !verifyPassword(password, row.password_salt, row.password_hash)) {
         return res.status(200).json({
           ok: true,
           password_required: true,
@@ -38,6 +51,7 @@ module.exports = async (req, res) => {
 
     if (req.method === "POST") {
       const body = await readJson(req);
+      const user = await getAuthUser(req);
       const id = makeId(10);
       const editToken = makeId(28);
       const passwordFields = passwordPayload(body.password);
@@ -46,6 +60,7 @@ module.exports = async (req, res) => {
         edit_token: editToken,
         ...passwordFields,
       });
+      if (user) row.owner_user_id = user.id;
 
       const created = await supabaseRequest(`${TABLE}?select=${PUBLIC_COLUMNS}`, {
         method: "POST",
@@ -57,10 +72,11 @@ module.exports = async (req, res) => {
 
     if (req.method === "PATCH") {
       const body = await readJson(req);
+      const user = await getAuthUser(req);
       const id = cleanId(body.id);
       const editToken = String(body.edit_token || "").trim();
-      if (!id || !editToken) {
-        return res.status(400).json({ ok: false, message: "id and edit_token are required." });
+      if (!id || (!editToken && !user)) {
+        return res.status(400).json({ ok: false, message: "id and edit permission are required." });
       }
 
       const row = normalizeNoteBody(body, { updated_at: new Date().toISOString() });
@@ -71,7 +87,10 @@ module.exports = async (req, res) => {
         Object.assign(row, passwordPayload(body.password));
       }
 
-      const updated = await supabaseRequest(`${TABLE}?id=eq.${encodeURIComponent(id)}&edit_token=eq.${encodeURIComponent(editToken)}&select=${PUBLIC_COLUMNS}`, {
+      const permissionFilter = user
+        ? `owner_user_id=eq.${encodeURIComponent(user.id)}`
+        : `edit_token=eq.${encodeURIComponent(editToken)}`;
+      const updated = await supabaseRequest(`${TABLE}?id=eq.${encodeURIComponent(id)}&${permissionFilter}&select=${PUBLIC_COLUMNS}`, {
         method: "PATCH",
         body: JSON.stringify(row),
       });
@@ -110,6 +129,27 @@ async function supabaseRequest(path, options) {
     throw new Error(data?.message || data?.hint || `Supabase error: ${response.status}`);
   }
   return Array.isArray(data) ? data : [];
+}
+
+async function getAuthUser(req) {
+  const auth = String(req.headers.authorization || "");
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+
+  const token = match[1].trim();
+  if (!token) return null;
+
+  const base = String(process.env.SUPABASE_URL || "").replace(/\/+$/, "");
+  const response = await fetch(`${base}/auth/v1/user`, {
+    headers: {
+      apikey: process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) return null;
+  const user = await response.json();
+  return user?.id ? user : null;
 }
 
 function readJson(req) {

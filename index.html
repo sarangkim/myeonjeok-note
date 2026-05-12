@@ -542,6 +542,16 @@
     <div class="workspace">
       <main class="results" id="results"></main>
       <aside class="note-panel">
+        <h2>내 메모</h2>
+        <div class="memo-box">
+          <input id="loginEmail" type="email" placeholder="이메일 주소">
+          <div class="button-row">
+            <button id="loginBtn" type="button">로그인 링크 받기</button>
+            <button class="secondary" id="logoutBtn" type="button" hidden>로그아웃</button>
+          </div>
+          <div class="note" id="authStatus">로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.</div>
+          <ul class="note-list" id="myNoteList"></ul>
+        </div>
         <h2>공유 메모</h2>
         <div class="memo-box">
           <textarea id="memo" placeholder="조회한 면적에 대한 메모를 적어두세요."></textarea>
@@ -586,6 +596,11 @@
       var shareBox = document.getElementById("shareBox");
       var protectNoteInput = document.getElementById("protectNote");
       var notePasswordInput = document.getElementById("notePassword");
+      var loginEmailInput = document.getElementById("loginEmail");
+      var loginBtn = document.getElementById("loginBtn");
+      var logoutBtn = document.getElementById("logoutBtn");
+      var authStatus = document.getElementById("authStatus");
+      var myNoteList = document.getElementById("myNoteList");
 
       var state = {
         floors: [],
@@ -597,7 +612,9 @@
         config: null,
         kakaoLoading: null,
         map: null,
-        marker: null
+        marker: null,
+        supabaseClient: null,
+        authSession: null
       };
 
       form.addEventListener("submit", function (event) {
@@ -630,7 +647,10 @@
         notePasswordInput.hidden = !protectNoteInput.checked;
         if (!protectNoteInput.checked) notePasswordInput.value = "";
       });
+      loginBtn.addEventListener("click", requestLoginLink);
+      logoutBtn.addEventListener("click", logout);
 
+      initAuth();
       loadSharedNoteFromUrl();
 
       async function requestArea(params) {
@@ -1028,7 +1048,7 @@
 
         setStatus("공유 메모를 불러오는 중입니다.");
         try {
-          var response = await fetch("/api/notes?id=" + encodeURIComponent(id));
+          var response = await fetch("/api/notes?id=" + encodeURIComponent(id), { headers: authHeaders() });
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "공유 메모를 불러오지 못했습니다.");
 
@@ -1084,7 +1104,7 @@
         try {
           var response = await fetch("/api/notes", {
             method: id && editToken ? "PATCH" : "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: authHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify(payload)
           });
           var data = await response.json().catch(function () { return null; });
@@ -1093,6 +1113,8 @@
           state.currentNote = data.note;
           if (data.edit_token) localStorage.setItem("myeonjeok_note_edit_" + data.note.id, data.edit_token);
           showShareLink(data.note.id);
+          rememberSavedNote(data.note);
+          if (state.authSession) loadMyNotes();
           setStatus("메모를 저장했습니다.");
         } catch (error) {
           setStatus(error.message, "error");
@@ -1167,7 +1189,7 @@
 
         setStatus("비밀번호를 확인하는 중입니다.");
         try {
-          var response = await fetch("/api/notes?id=" + encodeURIComponent(id) + "&password=" + encodeURIComponent(password));
+          var response = await fetch("/api/notes?id=" + encodeURIComponent(id) + "&password=" + encodeURIComponent(password), { headers: authHeaders() });
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "메모를 열지 못했습니다.");
           if (data.password_required) {
@@ -1195,6 +1217,178 @@
         noteList.innerHTML = state.recent.map(function (item) {
           return '<li class="note-card"><strong>' + esc(item.title) + '</strong><span>' + esc(item.road || item.address) + (item.total ? " · " + item.total : "") + '</span></li>';
         }).join("");
+      }
+
+      async function initAuth() {
+        var config = await getConfig();
+        if (!config.supabaseUrl || !config.supabaseAnonKey) {
+          authStatus.textContent = "Supabase anon key를 넣으면 로그인과 내 메모 목록이 켜집니다.";
+          renderLocalSavedNotes();
+          return;
+        }
+
+        var loaded = await loadSupabaseAuth(config);
+        if (!loaded) {
+          authStatus.textContent = "로그인 모듈을 불러오지 못했습니다.";
+          renderLocalSavedNotes();
+          return;
+        }
+
+        var sessionResult = await state.supabaseClient.auth.getSession();
+        state.authSession = sessionResult.data && sessionResult.data.session;
+        updateAuthUi();
+        if (state.authSession) loadMyNotes();
+        else renderLocalSavedNotes();
+
+        state.supabaseClient.auth.onAuthStateChange(function (_event, session) {
+          state.authSession = session;
+          updateAuthUi();
+          if (session) loadMyNotes();
+          else renderLocalSavedNotes();
+        });
+      }
+
+      async function loadSupabaseAuth(config) {
+        if (state.supabaseClient) return true;
+        if (!window.supabase) {
+          var ok = await new Promise(function (resolve) {
+            var script = document.createElement("script");
+            script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+            script.onload = function () { resolve(true); };
+            script.onerror = function () { resolve(false); };
+            document.head.appendChild(script);
+          });
+          if (!ok || !window.supabase) return false;
+        }
+
+        state.supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+        return true;
+      }
+
+      async function requestLoginLink() {
+        var email = loginEmailInput.value.trim();
+        if (!email) {
+          authStatus.textContent = "이메일을 입력해주세요.";
+          loginEmailInput.focus();
+          return;
+        }
+
+        var config = await getConfig();
+        var loaded = await loadSupabaseAuth(config);
+        if (!loaded) {
+          authStatus.textContent = "로그인 설정이 아직 준비되지 않았습니다.";
+          return;
+        }
+
+        var result = await state.supabaseClient.auth.signInWithOtp({
+          email: email,
+          options: { emailRedirectTo: window.location.origin + window.location.pathname }
+        });
+
+        authStatus.textContent = result.error ? result.error.message : "이메일로 로그인 링크를 보냈습니다.";
+      }
+
+      async function logout() {
+        if (state.supabaseClient) await state.supabaseClient.auth.signOut();
+        state.authSession = null;
+        updateAuthUi();
+        renderLocalSavedNotes();
+      }
+
+      function updateAuthUi() {
+        var user = state.authSession && state.authSession.user;
+        logoutBtn.hidden = !user;
+        loginBtn.hidden = !!user;
+        loginEmailInput.hidden = !!user;
+        authStatus.textContent = user
+          ? "로그인됨: " + (user.email || user.id)
+          : "로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.";
+      }
+
+      function authHeaders(base) {
+        var headers = base ? Object.assign({}, base) : {};
+        if (state.authSession && state.authSession.access_token) {
+          headers.Authorization = "Bearer " + state.authSession.access_token;
+        }
+        return headers;
+      }
+
+      async function loadMyNotes() {
+        try {
+          var response = await fetch("/api/notes?mine=1", { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "내 메모를 불러오지 못했습니다.");
+          renderMyNotes(data.notes || []);
+        } catch (error) {
+          authStatus.textContent = error.message;
+        }
+      }
+
+      function renderMyNotes(notes) {
+        if (!notes.length) {
+          myNoteList.innerHTML = '<li class="note-card"><span>저장한 메모가 없습니다.</span></li>';
+          return;
+        }
+
+        myNoteList.innerHTML = notes.map(function (note) {
+          return '<li class="note-card"><button class="chip" type="button" data-open-note="' + escAttr(note.id) + '">' + esc(note.ho ? note.ho + "호" : "메모") + '</button><strong>' + esc(note.road || note.address || "-") + '</strong><span>' + esc(note.has_password ? "비밀번호 보호" : "공개") + '</span></li>';
+        }).join("");
+
+        myNoteList.querySelectorAll("[data-open-note]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            openSavedNote(button.getAttribute("data-open-note"));
+          });
+        });
+      }
+
+      function rememberSavedNote(note) {
+        var ids = JSON.parse(localStorage.getItem("myeonjeok_note_ids") || "[]");
+        ids = [note.id].concat(ids.filter(function (id) { return id !== note.id; })).slice(0, 30);
+        localStorage.setItem("myeonjeok_note_ids", JSON.stringify(ids));
+      }
+
+      async function renderLocalSavedNotes() {
+        var ids = JSON.parse(localStorage.getItem("myeonjeok_note_ids") || "[]");
+        if (!ids.length) {
+          myNoteList.innerHTML = '<li class="note-card"><span>이 브라우저에 저장된 메모가 없습니다.</span></li>';
+          return;
+        }
+
+        myNoteList.innerHTML = ids.map(function (id) {
+          return '<li class="note-card"><button class="chip" type="button" data-open-note="' + escAttr(id) + '">메모 열기</button><span>' + esc(id) + '</span></li>';
+        }).join("");
+        myNoteList.querySelectorAll("[data-open-note]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            openSavedNote(button.getAttribute("data-open-note"));
+          });
+        });
+      }
+
+      async function openSavedNote(id) {
+        var response = await fetch("/api/notes?id=" + encodeURIComponent(id), { headers: authHeaders() });
+        var data = await response.json().catch(function () { return null; });
+        if (!response.ok || !data || data.ok === false) {
+          setStatus((data && data.message) || "메모를 열지 못했습니다.", "error");
+          return;
+        }
+        if (data.password_required) {
+          state.currentNote = data.note;
+          renderLockedNote(data.note);
+          showShareLink(id);
+          setStatus("비밀번호가 필요한 메모입니다.");
+          return;
+        }
+
+        var note = data.note;
+        state.currentNote = note;
+        state.currentResult = note.result || null;
+        memoInput.value = note.memo || "";
+        protectNoteInput.checked = !!note.has_password;
+        notePasswordInput.hidden = !protectNoteInput.checked;
+        renderSharedNote(note);
+        showShareLink(id);
+        renderMap(note);
+        setStatus("메모를 열었습니다.");
       }
 
       async function getConfig() {
