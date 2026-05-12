@@ -544,11 +544,13 @@
       <aside class="note-panel">
         <h2>내 메모</h2>
         <div class="memo-box">
-          <input id="loginEmail" type="email" placeholder="이메일 주소">
-          <div class="button-row">
-            <button id="loginBtn" type="button">로그인 링크 받기</button>
-            <button class="secondary" id="logoutBtn" type="button" hidden>로그아웃</button>
+          <div id="loginForm">
+            <input id="loginEmail" type="email" placeholder="이메일 주소">
+            <div class="button-row">
+              <button id="loginBtn" type="button">로그인 링크 받기</button>
+            </div>
           </div>
+          <button class="secondary" id="logoutBtn" type="button" hidden>로그아웃</button>
           <div class="note" id="authStatus">로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.</div>
           <ul class="note-list" id="myNoteList"></ul>
         </div>
@@ -601,6 +603,7 @@
       var logoutBtn = document.getElementById("logoutBtn");
       var authStatus = document.getElementById("authStatus");
       var myNoteList = document.getElementById("myNoteList");
+      var loginForm = document.getElementById("loginForm");
 
       var state = {
         floors: [],
@@ -1236,6 +1239,11 @@
 
         var sessionResult = await state.supabaseClient.auth.getSession();
         state.authSession = sessionResult.data && sessionResult.data.session;
+        if (!state.authSession && window.location.hash.indexOf("access_token=") !== -1) {
+          await new Promise(function (resolve) { setTimeout(resolve, 400); });
+          sessionResult = await state.supabaseClient.auth.getSession();
+          state.authSession = sessionResult.data && sessionResult.data.session;
+        }
         updateAuthUi();
         if (state.authSession) loadMyNotes();
         else renderLocalSavedNotes();
@@ -1266,6 +1274,12 @@
       }
 
       async function requestLoginLink() {
+        if (state.authSession && state.authSession.user) {
+          updateAuthUi();
+          authStatus.textContent = "이미 로그인되어 있습니다.";
+          return;
+        }
+
         var email = loginEmailInput.value.trim();
         if (!email) {
           authStatus.textContent = "이메일을 입력해주세요.";
@@ -1285,7 +1299,7 @@
           options: { emailRedirectTo: window.location.origin + window.location.pathname }
         });
 
-        authStatus.textContent = result.error ? result.error.message : "이메일로 로그인 링크를 보냈습니다.";
+        authStatus.textContent = result.error ? friendlyAuthError(result.error.message) : "이메일로 로그인 링크를 보냈습니다.";
       }
 
       async function logout() {
@@ -1298,11 +1312,19 @@
       function updateAuthUi() {
         var user = state.authSession && state.authSession.user;
         logoutBtn.hidden = !user;
-        loginBtn.hidden = !!user;
-        loginEmailInput.hidden = !!user;
+        loginForm.hidden = !!user;
+        loginBtn.disabled = !!user;
         authStatus.textContent = user
           ? "로그인됨: " + (user.email || user.id)
           : "로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.";
+      }
+
+      function friendlyAuthError(message) {
+        var text = String(message || "");
+        if (text.toLowerCase().includes("rate limit")) {
+          return "로그인 메일을 너무 자주 요청했습니다. 잠시 후 다시 시도해주세요.";
+        }
+        return text || "로그인 링크 요청에 실패했습니다.";
       }
 
       function authHeaders(base) {
