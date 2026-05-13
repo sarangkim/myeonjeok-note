@@ -1,9 +1,11 @@
 const REQUESTS_TABLE = "field_requests";
 const APPLICATIONS_TABLE = "field_request_applications";
+const PROFILES_TABLE = "user_profiles";
 
 const PUBLIC_REQUEST_COLUMNS = "id,public_area,cleaning_type,space_type,area_pyeong,reward_text,preferred_date,description,status,created_at,updated_at";
 const OWNER_REQUEST_COLUMNS = `${PUBLIC_REQUEST_COLUMNS},address,road,jibun,floor,ho,requester_user_id`;
 const APPLICATION_COLUMNS = "id,request_id,applicant_user_id,message,status,report_status,report_text,estimate_amount,completed_at,created_at,updated_at";
+const PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,bio";
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -180,9 +182,11 @@ async function attachApplicantDetails(applications) {
   const pairs = await Promise.all(uniqueIds.map(async (id) => [id, await getAuthUserEmail(id)]));
   const emails = new Map(pairs);
   const stats = await getApplicantStats(uniqueIds);
+  const profiles = await getProfiles(uniqueIds);
   return applications.map((app) => ({
     ...app,
     applicant_email: emails.get(app.applicant_user_id) || "",
+    applicant_profile: profiles.get(app.applicant_user_id) || null,
     applicant_stats: stats.get(app.applicant_user_id) || {
       applied_count: 0,
       approved_count: 0,
@@ -218,6 +222,20 @@ async function getApplicantStats(userIds) {
     if (row.report_status === "not_closed") current.not_closed_count += 1;
   }
   return stats;
+}
+
+async function getProfiles(userIds) {
+  const profiles = new Map();
+  if (!userIds.length) return profiles;
+
+  const filter = userIds.map((id) => encodeURIComponent(id)).join(",");
+  try {
+    const rows = await supabaseRequest(`${PROFILES_TABLE}?user_id=in.(${filter})&select=${PROFILE_COLUMNS}`, { method: "GET" });
+    for (const row of rows) profiles.set(row.user_id, row);
+  } catch (error) {
+    if (!String(error?.message || error).includes("does not exist") && !String(error?.message || error).includes("schema cache")) throw error;
+  }
+  return profiles;
 }
 
 async function getAuthUserEmail(userId) {

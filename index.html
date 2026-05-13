@@ -134,6 +134,45 @@
       font-weight: 800;
     }
 
+    .account-summary {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfb;
+      padding: 9px;
+    }
+
+    .account-summary strong {
+      font-size: 14px;
+    }
+
+    .account-summary span,
+    .profile-status {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .profile-form {
+      display: grid;
+      gap: 7px;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+
+    .profile-form textarea {
+      width: 100%;
+      min-height: 70px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      font: 13px var(--font);
+      line-height: 1.5;
+      padding: 9px 11px;
+      outline: none;
+    }
+
     .search-panel {
       display: grid;
       gap: 14px;
@@ -591,9 +630,19 @@
         <button class="account-button" id="accountButton" type="button" aria-label="계정 메뉴" aria-expanded="false">?</button>
         <div class="account-menu" id="accountMenu" hidden>
           <div class="account-email" id="accountEmail">로그인 필요</div>
+          <div class="account-summary" id="accountSummary" hidden></div>
           <button id="topGoogleLoginBtn" type="button">구글로 로그인</button>
           <input id="topLoginEmail" type="email" placeholder="이메일 주소">
           <button class="secondary" id="topLoginBtn" type="button">로그인 링크 받기</button>
+          <div class="profile-form" id="profileForm" hidden>
+            <input id="profileDisplayName" placeholder="이름 또는 담당자명">
+            <input id="profileCompanyName" placeholder="업체명">
+            <input id="profilePhone" placeholder="연락처">
+            <input id="profileServiceArea" placeholder="활동지역 예: 서울 강서구, 마포구">
+            <textarea id="profileBio" placeholder="소개 예: 사무실 정기청소와 입주청소를 주로 합니다."></textarea>
+            <button id="saveProfileBtn" type="button">프로필 저장</button>
+            <div class="profile-status" id="profileStatus"></div>
+          </div>
           <button class="secondary" id="topLogoutBtn" type="button" hidden>로그아웃</button>
         </div>
       </div>
@@ -712,10 +761,19 @@
       var accountButton = document.getElementById("accountButton");
       var accountMenu = document.getElementById("accountMenu");
       var accountEmail = document.getElementById("accountEmail");
+      var accountSummary = document.getElementById("accountSummary");
       var topLoginEmailInput = document.getElementById("topLoginEmail");
       var topLoginBtn = document.getElementById("topLoginBtn");
       var topGoogleLoginBtn = document.getElementById("topGoogleLoginBtn");
       var topLogoutBtn = document.getElementById("topLogoutBtn");
+      var profileForm = document.getElementById("profileForm");
+      var profileDisplayNameInput = document.getElementById("profileDisplayName");
+      var profileCompanyNameInput = document.getElementById("profileCompanyName");
+      var profilePhoneInput = document.getElementById("profilePhone");
+      var profileServiceAreaInput = document.getElementById("profileServiceArea");
+      var profileBioInput = document.getElementById("profileBio");
+      var saveProfileBtn = document.getElementById("saveProfileBtn");
+      var profileStatus = document.getElementById("profileStatus");
       var fieldPublicAreaInput = document.getElementById("fieldPublicArea");
       var fieldCleaningTypeInput = document.getElementById("fieldCleaningType");
       var fieldSpaceTypeInput = document.getElementById("fieldSpaceType");
@@ -741,7 +799,9 @@
         map: null,
         marker: null,
         supabaseClient: null,
-        authSession: null
+        authSession: null,
+        profile: null,
+        profileStats: null
       };
 
       form.addEventListener("submit", function (event) {
@@ -781,6 +841,7 @@
       topLoginBtn.addEventListener("click", requestLoginLink);
       topGoogleLoginBtn.addEventListener("click", loginWithGoogle);
       topLogoutBtn.addEventListener("click", logout);
+      saveProfileBtn.addEventListener("click", saveProfile);
       createFieldRequestBtn.addEventListener("click", createFieldRequest);
       loadFieldRequestsBtn.addEventListener("click", loadFieldRequests);
       loadMyFieldRequestsBtn.addEventListener("click", loadMyFieldRequests);
@@ -1381,14 +1442,24 @@
           state.authSession = sessionResult.data && sessionResult.data.session;
         }
         updateAuthUi();
-        if (state.authSession) loadMyNotes();
+        if (state.authSession) {
+          loadMyNotes();
+          loadProfile();
+        }
         else renderLocalSavedNotes();
 
         state.supabaseClient.auth.onAuthStateChange(function (_event, session) {
           state.authSession = session;
           updateAuthUi();
-          if (session) loadMyNotes();
-          else renderLocalSavedNotes();
+          if (session) {
+            loadMyNotes();
+            loadProfile();
+          } else {
+            state.profile = null;
+            state.profileStats = null;
+            renderLocalSavedNotes();
+            updateAuthUi();
+          }
         });
       }
 
@@ -1463,6 +1534,8 @@
       async function logout() {
         if (state.supabaseClient) await state.supabaseClient.auth.signOut();
         state.authSession = null;
+        state.profile = null;
+        state.profileStats = null;
         updateAuthUi();
         renderLocalSavedNotes();
       }
@@ -1474,6 +1547,8 @@
 
         accountButton.textContent = initial;
         accountEmail.textContent = user ? label : "로그인이 필요합니다";
+        accountSummary.hidden = !user;
+        profileForm.hidden = !user;
         topGoogleLoginBtn.hidden = !!user;
         topLoginEmailInput.hidden = !!user;
         topLoginBtn.hidden = !!user;
@@ -1487,12 +1562,86 @@
         authStatus.textContent = user
           ? "로그인됨: " + (user.email || user.id)
           : "로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.";
+        renderAccountProfile();
       }
 
       function toggleAccountMenu() {
         var nextHidden = !accountMenu.hidden;
         accountMenu.hidden = nextHidden;
         accountButton.setAttribute("aria-expanded", String(!nextHidden));
+      }
+
+      async function loadProfile() {
+        if (!state.authSession) return;
+        try {
+          var response = await fetch("/api/profile", { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "프로필을 불러오지 못했습니다.");
+          state.profile = data.profile || null;
+          state.profileStats = data.stats || null;
+          fillProfileForm();
+          renderAccountProfile();
+        } catch (error) {
+          profileStatus.textContent = error.message;
+        }
+      }
+
+      async function saveProfile() {
+        if (!state.authSession) {
+          profileStatus.textContent = "로그인이 필요합니다.";
+          return;
+        }
+
+        profileStatus.textContent = "프로필을 저장하는 중입니다.";
+        try {
+          var response = await fetch("/api/profile", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({
+              display_name: profileDisplayNameInput.value,
+              company_name: profileCompanyNameInput.value,
+              phone: profilePhoneInput.value,
+              service_area: profileServiceAreaInput.value,
+              bio: profileBioInput.value
+            })
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "프로필 저장에 실패했습니다.");
+          state.profile = data.profile || null;
+          state.profileStats = data.stats || null;
+          fillProfileForm();
+          renderAccountProfile();
+          profileStatus.textContent = "프로필을 저장했습니다.";
+        } catch (error) {
+          profileStatus.textContent = error.message;
+        }
+      }
+
+      function fillProfileForm() {
+        var profile = state.profile || {};
+        profileDisplayNameInput.value = profile.display_name || "";
+        profileCompanyNameInput.value = profile.company_name || "";
+        profilePhoneInput.value = profile.phone || "";
+        profileServiceAreaInput.value = profile.service_area || "";
+        profileBioInput.value = profile.bio || "";
+      }
+
+      function renderAccountProfile() {
+        var user = state.authSession && state.authSession.user;
+        if (!user) {
+          accountSummary.innerHTML = "";
+          return;
+        }
+
+        var profile = state.profile || {};
+        var title = profile.company_name || profile.display_name || user.email || "프로필 미입력";
+        var line = [profile.display_name, profile.service_area].filter(Boolean).join(" · ");
+        var contact = [profile.phone, profile.bio].filter(Boolean).join(" · ");
+        accountSummary.innerHTML =
+          '<strong>' + esc(title) + '</strong>' +
+          (line ? '<span>' + esc(line) + '</span>' : '<span>프로필을 입력하면 신청자에게 더 잘 보입니다.</span>') +
+          (contact ? '<span>' + esc(contact) + '</span>' : '') +
+          '<span>' + esc(applicantStatsText(state.profileStats)) + '</span>';
       }
 
       function friendlyAuthError(message) {
@@ -1785,8 +1934,14 @@
 
         fieldRequestList.innerHTML = applications.map(function (application) {
           var applicant = application.applicant_email || ("신청자 " + String(application.applicant_user_id || "").slice(0, 8));
+          var profile = application.applicant_profile || {};
+          var profileTitle = profile.company_name || profile.display_name || "";
+          var profileLine = [profile.display_name, profile.service_area, profile.phone].filter(Boolean).join(" · ");
           return '<li class="note-card">' +
             '<strong>' + esc(applicant) + '</strong>' +
+            (profileTitle ? '<span>' + esc("프로필: " + profileTitle) + '</span>' : '<span>프로필 미입력</span>') +
+            (profileLine ? '<span>' + esc(profileLine) + '</span>' : '') +
+            (profile.bio ? '<span>' + esc(profile.bio) + '</span>' : '') +
             '<span>' + esc((application.status === "approved" ? "승인됨" : "승인 대기") + " · " + formatDateTime(application.created_at)) + '</span>' +
             '<span>' + esc(applicantStatsText(application.applicant_stats)) + '</span>' +
             '<span>' + esc(application.message || "메시지 없음") + '</span>' +
