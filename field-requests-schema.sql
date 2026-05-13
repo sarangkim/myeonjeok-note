@@ -24,10 +24,19 @@ create table if not exists public.field_request_applications (
   applicant_user_id uuid not null,
   message text not null default '',
   status text not null default 'pending',
+  report_status text,
+  report_text text not null default '',
+  estimate_amount text not null default '',
+  completed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (request_id, applicant_user_id)
 );
+
+alter table public.field_request_applications add column if not exists report_status text;
+alter table public.field_request_applications add column if not exists report_text text not null default '';
+alter table public.field_request_applications add column if not exists estimate_amount text not null default '';
+alter table public.field_request_applications add column if not exists completed_at timestamptz;
 
 create index if not exists field_requests_status_created_at_idx on public.field_requests (status, created_at desc);
 create index if not exists field_requests_requester_idx on public.field_requests (requester_user_id, updated_at desc);

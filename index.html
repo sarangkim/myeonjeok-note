@@ -599,6 +599,7 @@
           <button id="createFieldRequestBtn" type="button">현장 견적 요청 등록</button>
           <button class="secondary" id="loadFieldRequestsBtn" type="button">공개 요청 보기</button>
           <button class="secondary" id="loadMyFieldRequestsBtn" type="button">내 요청 보기</button>
+          <button class="secondary" id="loadAppliedFieldRequestsBtn" type="button">내 신청 보기</button>
           <div class="note" id="fieldStatus"></div>
           <ul class="note-list" id="fieldRequestList"></ul>
         </div>
@@ -648,6 +649,7 @@
       var createFieldRequestBtn = document.getElementById("createFieldRequestBtn");
       var loadFieldRequestsBtn = document.getElementById("loadFieldRequestsBtn");
       var loadMyFieldRequestsBtn = document.getElementById("loadMyFieldRequestsBtn");
+      var loadAppliedFieldRequestsBtn = document.getElementById("loadAppliedFieldRequestsBtn");
       var fieldStatus = document.getElementById("fieldStatus");
       var fieldRequestList = document.getElementById("fieldRequestList");
 
@@ -702,6 +704,7 @@
       createFieldRequestBtn.addEventListener("click", createFieldRequest);
       loadFieldRequestsBtn.addEventListener("click", loadFieldRequests);
       loadMyFieldRequestsBtn.addEventListener("click", loadMyFieldRequests);
+      loadAppliedFieldRequestsBtn.addEventListener("click", loadAppliedFieldRequests);
 
       initAuth();
       loadSharedNoteFromUrl();
@@ -1682,6 +1685,8 @@
           return '<li class="note-card">' +
             '<strong>' + esc(application.status === "approved" ? "승인됨" : "승인 대기") + '</strong>' +
             '<span>' + esc(application.message || "메시지 없음") + '</span>' +
+            (application.report_status ? '<span>' + esc("보고: " + application.report_status + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
+            (application.report_text ? '<span>' + esc(application.report_text) + '</span>' : '') +
             (application.status === "approved" ? '' : '<button class="chip" type="button" data-approve-app="' + escAttr(application.id) + '">승인</button>') +
             '</li>';
         }).join("") + '<li class="note-card"><button class="chip" type="button" data-back-my-requests="1">내 요청으로 돌아가기</button></li>';
@@ -1742,6 +1747,81 @@
         fieldRequestList.querySelectorAll("[data-load-public-requests]").forEach(function (button) {
           button.addEventListener("click", loadFieldRequests);
         });
+      }
+
+      async function loadAppliedFieldRequests() {
+        if (!state.authSession) {
+          fieldStatus.textContent = "내 신청 보기는 로그인이 필요합니다.";
+          return;
+        }
+
+        fieldStatus.textContent = "내 신청을 불러오는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests?applied=1", { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "내 신청을 불러오지 못했습니다.");
+          renderAppliedFieldRequests(data.applications || []);
+          fieldStatus.textContent = "내 신청을 불러왔습니다.";
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      function renderAppliedFieldRequests(applications) {
+        if (!applications.length) {
+          fieldRequestList.innerHTML = '<li class="note-card"><span>내가 신청한 현장 요청이 없습니다.</span></li>';
+          return;
+        }
+
+        fieldRequestList.innerHTML = applications.map(function (application) {
+          return '<li class="note-card">' +
+            '<strong>' + esc(application.status === "approved" ? "승인됨" : "승인 대기") + '</strong>' +
+            '<span>' + esc(application.message || "메시지 없음") + '</span>' +
+            (application.report_status ? '<span>' + esc("보고: " + application.report_status + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
+            (application.status === "approved" ? '<button class="chip" type="button" data-app-detail="' + escAttr(application.request_id) + '">상세주소 보기</button><button class="chip" type="button" data-submit-report="' + escAttr(application.id) + '">방문/견적 보고</button>' : '') +
+            '</li>';
+        }).join("");
+
+        fieldRequestList.querySelectorAll("[data-app-detail]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            loadFieldRequestDetail(button.getAttribute("data-app-detail"));
+          });
+        });
+        fieldRequestList.querySelectorAll("[data-submit-report]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            submitFieldReport(button.getAttribute("data-submit-report"));
+          });
+        });
+      }
+
+      async function submitFieldReport(applicationId) {
+        var reportStatus = window.prompt("보고 상태를 입력하세요: visited, quoted, not_closed", "quoted");
+        if (reportStatus === null) return;
+        var estimateAmount = window.prompt("견적 금액 또는 조건을 입력하세요.", "");
+        if (estimateAmount === null) return;
+        var reportText = window.prompt("방문 메모/미성사 사유/추가 설명을 입력하세요.", "");
+        if (reportText === null) return;
+
+        fieldStatus.textContent = "방문/견적 보고를 저장하는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests", {
+            method: "PATCH",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({
+              action: "report",
+              application_id: applicationId,
+              report_status: reportStatus,
+              estimate_amount: estimateAmount,
+              report_text: reportText
+            })
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "보고 저장에 실패했습니다.");
+          fieldStatus.textContent = "방문/견적 보고를 저장했습니다.";
+          loadAppliedFieldRequests();
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
       }
 
       async function getConfig() {

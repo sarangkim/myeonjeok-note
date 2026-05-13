@@ -3,7 +3,7 @@ const APPLICATIONS_TABLE = "field_request_applications";
 
 const PUBLIC_REQUEST_COLUMNS = "id,public_area,cleaning_type,space_type,area_pyeong,reward_text,preferred_date,description,status,created_at,updated_at";
 const OWNER_REQUEST_COLUMNS = `${PUBLIC_REQUEST_COLUMNS},address,road,jibun,floor,ho,requester_user_id`;
-const APPLICATION_COLUMNS = "id,request_id,applicant_user_id,message,status,created_at,updated_at";
+const APPLICATION_COLUMNS = "id,request_id,applicant_user_id,message,status,report_status,report_text,estimate_amount,completed_at,created_at,updated_at";
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -48,6 +48,12 @@ module.exports = async (req, res) => {
         if (!rows.length) return res.status(403).json({ ok: false, message: "Only the requester can view applications." });
 
         const applications = await supabaseRequest(`${APPLICATIONS_TABLE}?request_id=eq.${encodeURIComponent(requestId)}&select=${APPLICATION_COLUMNS}&order=created_at.asc`, { method: "GET" });
+        return res.status(200).json({ ok: true, applications });
+      }
+
+      if (String(req.query.applied || "") === "1") {
+        if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+        const applications = await supabaseRequest(`${APPLICATIONS_TABLE}?applicant_user_id=eq.${encodeURIComponent(user.id)}&select=${APPLICATION_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" });
         return res.status(200).json({ ok: true, applications });
       }
 
@@ -107,6 +113,30 @@ module.exports = async (req, res) => {
           method: "PATCH",
           body: JSON.stringify({ status: "approved", updated_at: new Date().toISOString() }),
         });
+        return res.status(200).json({ ok: true, application: updated[0] });
+      }
+
+      if (body.action === "report") {
+        const applicationId = cleanId(body.application_id);
+        if (!applicationId) return res.status(400).json({ ok: false, message: "application_id is required." });
+
+        const status = String(body.report_status || "").trim();
+        if (!["visited", "quoted", "not_closed"].includes(status)) {
+          return res.status(400).json({ ok: false, message: "Invalid report_status." });
+        }
+
+        const updated = await supabaseRequest(`${APPLICATIONS_TABLE}?id=eq.${encodeURIComponent(applicationId)}&applicant_user_id=eq.${encodeURIComponent(user.id)}&status=eq.approved&select=${APPLICATION_COLUMNS}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            report_status: status,
+            report_text: clamp(body.report_text, 2000),
+            estimate_amount: clamp(body.estimate_amount, 120),
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }),
+        });
+
+        if (!updated.length) return res.status(403).json({ ok: false, message: "Approved applicant only." });
         return res.status(200).json({ ok: true, application: updated[0] });
       }
 
