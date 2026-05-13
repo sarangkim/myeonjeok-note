@@ -3,7 +3,7 @@ const APPLICATIONS_TABLE = "field_request_applications";
 
 const PUBLIC_REQUEST_COLUMNS = "id,public_area,cleaning_type,space_type,area_pyeong,reward_text,preferred_date,description,status,created_at,updated_at";
 const OWNER_REQUEST_COLUMNS = `${PUBLIC_REQUEST_COLUMNS},address,road,jibun,floor,ho,requester_user_id`;
-const APPLICATION_COLUMNS = "id,request_id,applicant_user_id,applicant_email,message,status,report_status,report_text,estimate_amount,completed_at,created_at,updated_at";
+const APPLICATION_COLUMNS = "id,request_id,applicant_user_id,message,status,report_status,report_text,estimate_amount,completed_at,created_at,updated_at";
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -18,43 +18,43 @@ module.exports = async (req, res) => {
 
     if (req.method === "GET") {
       if (String(req.query.detail || "") === "1") {
-        if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+        if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
         const requestId = cleanId(req.query.request_id);
-        if (!requestId) return res.status(400).json({ ok: false, message: "request_id is required." });
+        if (!requestId) return res.status(400).json({ ok: false, message: "요청 ID가 필요합니다." });
 
         const ownerRows = await supabaseRequest(`${REQUESTS_TABLE}?id=eq.${encodeURIComponent(requestId)}&requester_user_id=eq.${encodeURIComponent(user.id)}&select=${OWNER_REQUEST_COLUMNS}`, { method: "GET" });
         if (ownerRows.length) return res.status(200).json({ ok: true, request: ownerRows[0], access: "owner" });
 
         const approvedRows = await supabaseRequest(`${APPLICATIONS_TABLE}?request_id=eq.${encodeURIComponent(requestId)}&applicant_user_id=eq.${encodeURIComponent(user.id)}&status=eq.approved&select=id`, { method: "GET" });
-        if (!approvedRows.length) return res.status(403).json({ ok: false, message: "Approved applicants only." });
+        if (!approvedRows.length) return res.status(403).json({ ok: false, message: "승인된 신청자만 상세주소를 볼 수 있습니다." });
 
         const rows = await supabaseRequest(`${REQUESTS_TABLE}?id=eq.${encodeURIComponent(requestId)}&select=${OWNER_REQUEST_COLUMNS}`, { method: "GET" });
-        if (!rows.length) return res.status(404).json({ ok: false, message: "Request not found." });
+        if (!rows.length) return res.status(404).json({ ok: false, message: "요청을 찾을 수 없습니다." });
         return res.status(200).json({ ok: true, request: rows[0], access: "approved_applicant" });
       }
 
       if (String(req.query.mine || "") === "1") {
-        if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+        if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
         const mine = await supabaseRequest(`${REQUESTS_TABLE}?requester_user_id=eq.${encodeURIComponent(user.id)}&select=${OWNER_REQUEST_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" });
         return res.status(200).json({ ok: true, requests: await attachApplicationCounts(mine) });
       }
 
       if (String(req.query.applications || "") === "1") {
-        if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+        if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
         const requestId = cleanId(req.query.request_id);
-        if (!requestId) return res.status(400).json({ ok: false, message: "request_id is required." });
+        if (!requestId) return res.status(400).json({ ok: false, message: "요청 ID가 필요합니다." });
 
         const rows = await supabaseRequest(`${REQUESTS_TABLE}?id=eq.${encodeURIComponent(requestId)}&requester_user_id=eq.${encodeURIComponent(user.id)}&select=id`, { method: "GET" });
-        if (!rows.length) return res.status(403).json({ ok: false, message: "Only the requester can view applications." });
+        if (!rows.length) return res.status(403).json({ ok: false, message: "요청 작성자만 신청자를 볼 수 있습니다." });
 
         const applications = await supabaseRequest(`${APPLICATIONS_TABLE}?request_id=eq.${encodeURIComponent(requestId)}&select=${APPLICATION_COLUMNS}&order=created_at.asc`, { method: "GET" });
-        return res.status(200).json({ ok: true, applications });
+        return res.status(200).json({ ok: true, applications: await attachApplicantEmails(applications) });
       }
 
       if (String(req.query.applied || "") === "1") {
-        if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+        if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
         const applications = await supabaseRequest(`${APPLICATIONS_TABLE}?applicant_user_id=eq.${encodeURIComponent(user.id)}&select=${APPLICATION_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" });
-        return res.status(200).json({ ok: true, applications });
+        return res.status(200).json({ ok: true, applications: await attachApplicantEmails(applications) });
       }
 
       const requests = await supabaseRequest(`${REQUESTS_TABLE}?status=eq.open&select=${PUBLIC_REQUEST_COLUMNS}&order=created_at.desc&limit=100`, { method: "GET" });
@@ -62,17 +62,16 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === "POST") {
-      if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+      if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
       const body = await readJson(req);
 
       if (body.action === "apply") {
         const requestId = cleanId(body.request_id);
-        if (!requestId) return res.status(400).json({ ok: false, message: "request_id is required." });
+        if (!requestId) return res.status(400).json({ ok: false, message: "요청 ID가 필요합니다." });
         const row = {
           id: makeId(10),
           request_id: requestId,
           applicant_user_id: user.id,
-          applicant_email: clamp(user.email, 320),
           message: clamp(body.message, 1000),
           status: "pending",
         };
@@ -80,7 +79,8 @@ module.exports = async (req, res) => {
           method: "POST",
           body: JSON.stringify(row),
         });
-        return res.status(201).json({ ok: true, application: created[0] });
+        const application = created[0] ? { ...created[0], applicant_email: user.email || "" } : null;
+        return res.status(201).json({ ok: true, application });
       }
 
       const row = normalizeRequestBody(body, {
@@ -96,19 +96,19 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === "PATCH") {
-      if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+      if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
       const body = await readJson(req);
 
       if (body.action === "approve") {
         const applicationId = cleanId(body.application_id);
-        if (!applicationId) return res.status(400).json({ ok: false, message: "application_id is required." });
+        if (!applicationId) return res.status(400).json({ ok: false, message: "신청 ID가 필요합니다." });
 
         const applicationRows = await supabaseRequest(`${APPLICATIONS_TABLE}?id=eq.${encodeURIComponent(applicationId)}&select=${APPLICATION_COLUMNS}`, { method: "GET" });
-        if (!applicationRows.length) return res.status(404).json({ ok: false, message: "Application not found." });
+        if (!applicationRows.length) return res.status(404).json({ ok: false, message: "신청을 찾을 수 없습니다." });
 
         const app = applicationRows[0];
         const ownerRows = await supabaseRequest(`${REQUESTS_TABLE}?id=eq.${encodeURIComponent(app.request_id)}&requester_user_id=eq.${encodeURIComponent(user.id)}&select=id`, { method: "GET" });
-        if (!ownerRows.length) return res.status(403).json({ ok: false, message: "Only the requester can approve." });
+        if (!ownerRows.length) return res.status(403).json({ ok: false, message: "요청 작성자만 승인할 수 있습니다." });
 
         const updated = await supabaseRequest(`${APPLICATIONS_TABLE}?id=eq.${encodeURIComponent(applicationId)}&select=${APPLICATION_COLUMNS}`, {
           method: "PATCH",
@@ -119,11 +119,11 @@ module.exports = async (req, res) => {
 
       if (body.action === "report") {
         const applicationId = cleanId(body.application_id);
-        if (!applicationId) return res.status(400).json({ ok: false, message: "application_id is required." });
+        if (!applicationId) return res.status(400).json({ ok: false, message: "신청 ID가 필요합니다." });
 
         const status = String(body.report_status || "").trim();
         if (!["visited", "quoted", "not_closed"].includes(status)) {
-          return res.status(400).json({ ok: false, message: "Invalid report_status." });
+          return res.status(400).json({ ok: false, message: "보고 상태가 올바르지 않습니다." });
         }
 
         const updated = await supabaseRequest(`${APPLICATIONS_TABLE}?id=eq.${encodeURIComponent(applicationId)}&applicant_user_id=eq.${encodeURIComponent(user.id)}&status=eq.approved&select=${APPLICATION_COLUMNS}`, {
@@ -137,22 +137,22 @@ module.exports = async (req, res) => {
           }),
         });
 
-        if (!updated.length) return res.status(403).json({ ok: false, message: "Approved applicant only." });
+        if (!updated.length) return res.status(403).json({ ok: false, message: "승인된 신청자만 보고할 수 있습니다." });
         return res.status(200).json({ ok: true, application: updated[0] });
       }
 
-      return res.status(400).json({ ok: false, message: "Unsupported action." });
+      return res.status(400).json({ ok: false, message: "지원하지 않는 작업입니다." });
     }
 
-    return res.status(405).json({ ok: false, message: "Method not allowed." });
+    return res.status(405).json({ ok: false, message: "허용되지 않는 요청 방식입니다." });
   } catch (error) {
-    return res.status(500).json({ ok: false, message: error.message || String(error) });
+    return res.status(500).json({ ok: false, message: toKoreanError(error) });
   }
 };
 
 function assertSupabaseEnv() {
-  if (!process.env.SUPABASE_URL) throw new Error("SUPABASE_URL is missing.");
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing.");
+  if (!process.env.SUPABASE_URL) throw new Error("Supabase 주소 설정이 없습니다.");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase 서비스 키 설정이 없습니다.");
 }
 
 async function supabaseRequest(path, options) {
@@ -170,8 +170,32 @@ async function supabaseRequest(path, options) {
 
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(data?.message || data?.hint || `Supabase error: ${response.status}`);
+  if (!response.ok) throw new Error(data?.message || data?.hint || `Supabase 오류: ${response.status}`);
   return Array.isArray(data) ? data : [];
+}
+
+async function attachApplicantEmails(applications) {
+  if (!applications.length) return applications;
+  const uniqueIds = [...new Set(applications.map((app) => app.applicant_user_id).filter(Boolean))];
+  const pairs = await Promise.all(uniqueIds.map(async (id) => [id, await getAuthUserEmail(id)]));
+  const emails = new Map(pairs);
+  return applications.map((app) => ({
+    ...app,
+    applicant_email: emails.get(app.applicant_user_id) || "",
+  }));
+}
+
+async function getAuthUserEmail(userId) {
+  const base = String(process.env.SUPABASE_URL || "").replace(/\/+$/, "");
+  const response = await fetch(`${base}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+    headers: {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+  });
+  if (!response.ok) return "";
+  const user = await response.json();
+  return user?.email || "";
 }
 
 async function attachApplicationCounts(requests) {
@@ -215,18 +239,27 @@ function readJson(req) {
       raw += chunk;
       if (raw.length > 1024 * 1024) {
         req.destroy();
-        reject(new Error("Request body is too large."));
+        reject(new Error("요청 내용이 너무 큽니다."));
       }
     });
     req.on("end", () => {
       try {
         resolve(raw ? JSON.parse(raw) : {});
       } catch {
-        reject(new Error("Invalid JSON body."));
+        reject(new Error("요청 형식이 올바르지 않습니다."));
       }
     });
     req.on("error", reject);
   });
+}
+
+function toKoreanError(error) {
+  const message = String(error?.message || error || "");
+  if (message.includes("does not exist") || message.includes("schema cache")) {
+    return "데이터베이스 구조가 아직 맞지 않습니다. 잠시 후 다시 시도해주세요.";
+  }
+  if (message.toLowerCase().includes("duplicate")) return "이미 신청한 요청입니다.";
+  return message || "처리 중 오류가 발생했습니다.";
 }
 
 function normalizeRequestBody(body, extra) {

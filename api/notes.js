@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
     if (req.method === "GET") {
       const user = await getAuthUser(req);
       if (String(req.query.mine || "") === "1") {
-        if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+        if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
 
         const rows = await supabaseRequest(`${TABLE}?owner_user_id=eq.${encodeURIComponent(user.id)}&select=${PUBLIC_COLUMNS}&order=updated_at.desc&limit=100`, {
           method: "GET",
@@ -27,14 +27,14 @@ module.exports = async (req, res) => {
       }
 
       const id = cleanId(req.query.id);
-      if (!id) return res.status(400).json({ ok: false, message: "id is required." });
+      if (!id) return res.status(400).json({ ok: false, message: "메모 ID가 필요합니다." });
 
       const password = String(req.query.password || "");
       const rows = await supabaseRequest(`${TABLE}?id=eq.${encodeURIComponent(id)}&select=${PRIVATE_COLUMNS}`, {
         method: "GET",
       });
 
-      if (!rows.length) return res.status(404).json({ ok: false, message: "Note not found." });
+      if (!rows.length) return res.status(404).json({ ok: false, message: "메모를 찾을 수 없습니다." });
 
       const row = rows[0];
       const isOwner = user && row.owner_user_id && String(row.owner_user_id) === String(user.id);
@@ -76,7 +76,7 @@ module.exports = async (req, res) => {
       const id = cleanId(body.id);
       const editToken = String(body.edit_token || "").trim();
       if (!id || (!editToken && !user)) {
-        return res.status(400).json({ ok: false, message: "id and edit permission are required." });
+        return res.status(400).json({ ok: false, message: "메모 ID와 수정 권한이 필요합니다." });
       }
 
       const row = normalizeNoteBody(body, { updated_at: new Date().toISOString() });
@@ -95,19 +95,19 @@ module.exports = async (req, res) => {
         body: JSON.stringify(row),
       });
 
-      if (!updated.length) return res.status(403).json({ ok: false, message: "No edit permission or note not found." });
+      if (!updated.length) return res.status(403).json({ ok: false, message: "수정 권한이 없거나 메모를 찾을 수 없습니다." });
       return res.status(200).json({ ok: true, note: updated[0] });
     }
 
-    return res.status(405).json({ ok: false, message: "Method not allowed." });
+    return res.status(405).json({ ok: false, message: "허용되지 않는 요청 방식입니다." });
   } catch (error) {
     return res.status(500).json({ ok: false, message: error.message || String(error) });
   }
 };
 
 function assertSupabaseEnv() {
-  if (!process.env.SUPABASE_URL) throw new Error("SUPABASE_URL is missing.");
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing.");
+  if (!process.env.SUPABASE_URL) throw new Error("Supabase 주소 설정이 없습니다.");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase 서비스 키 설정이 없습니다.");
 }
 
 async function supabaseRequest(path, options) {
@@ -126,7 +126,7 @@ async function supabaseRequest(path, options) {
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) {
-    throw new Error(data?.message || data?.hint || `Supabase error: ${response.status}`);
+    throw new Error(data?.message || data?.hint || `Supabase 오류: ${response.status}`);
   }
   return Array.isArray(data) ? data : [];
 }
@@ -159,14 +159,14 @@ function readJson(req) {
       raw += chunk;
       if (raw.length > 1024 * 1024) {
         req.destroy();
-        reject(new Error("Request body is too large."));
+        reject(new Error("요청 내용이 너무 큽니다."));
       }
     });
     req.on("end", () => {
       try {
         resolve(raw ? JSON.parse(raw) : {});
       } catch {
-        reject(new Error("Invalid JSON body."));
+        reject(new Error("요청 형식이 올바르지 않습니다."));
       }
     });
     req.on("error", reject);

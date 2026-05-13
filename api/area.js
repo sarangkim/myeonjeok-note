@@ -297,7 +297,7 @@ function assertApiOk(xmlText, apiName) {
     throw new Error(`${apiName} 호출 실패: ${resultCode} ${resultMsg}`.trim());
   }
   if (String(xmlText || "").includes("API not found")) {
-    throw new Error(`${apiName} 호출 실패: API not found`);
+    throw new Error(`${apiName} 호출 실패: API를 찾을 수 없습니다.`);
   }
 }
 

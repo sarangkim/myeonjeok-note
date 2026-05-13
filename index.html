@@ -591,7 +591,7 @@
         <button class="account-button" id="accountButton" type="button" aria-label="계정 메뉴" aria-expanded="false">?</button>
         <div class="account-menu" id="accountMenu" hidden>
           <div class="account-email" id="accountEmail">로그인 필요</div>
-          <button id="topGoogleLoginBtn" type="button">Google로 로그인</button>
+          <button id="topGoogleLoginBtn" type="button">구글로 로그인</button>
           <input id="topLoginEmail" type="email" placeholder="이메일 주소">
           <button class="secondary" id="topLoginBtn" type="button">로그인 링크 받기</button>
           <button class="secondary" id="topLogoutBtn" type="button" hidden>로그아웃</button>
@@ -632,7 +632,7 @@
         <h2>내 메모</h2>
         <div class="memo-box">
           <div id="loginForm" hidden>
-            <button id="googleLoginBtn" type="button">Google로 로그인</button>
+            <button id="googleLoginBtn" type="button">구글로 로그인</button>
             <div class="note">또는 이메일 링크로 로그인</div>
             <input id="loginEmail" type="email" placeholder="이메일 주소">
             <div class="button-row">
@@ -1452,7 +1452,7 @@
           return;
         }
 
-        authStatus.textContent = "Google 로그인으로 이동합니다.";
+        authStatus.textContent = "구글 로그인으로 이동합니다.";
         var result = await state.supabaseClient.auth.signInWithOAuth({
           provider: "google",
           options: { redirectTo: window.location.origin + window.location.pathname }
@@ -1789,7 +1789,7 @@
             '<strong>' + esc(applicant) + '</strong>' +
             '<span>' + esc((application.status === "approved" ? "승인됨" : "승인 대기") + " · " + formatDateTime(application.created_at)) + '</span>' +
             '<span>' + esc(application.message || "메시지 없음") + '</span>' +
-            (application.report_status ? '<span>' + esc("보고: " + application.report_status + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
+            (application.report_status ? '<span>' + esc("보고: " + reportStatusLabel(application.report_status) + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
             (application.report_text ? '<span>' + esc(application.report_text) + '</span>' : '') +
             (application.status === "approved" ? '' : '<button class="chip" type="button" data-approve-app="' + escAttr(application.id) + '">승인</button>') +
             '</li>';
@@ -1881,7 +1881,7 @@
           return '<li class="note-card">' +
             '<strong>' + esc(application.status === "approved" ? "승인됨" : "승인 대기") + '</strong>' +
             '<span>' + esc(application.message || "메시지 없음") + '</span>' +
-            (application.report_status ? '<span>' + esc("보고: " + application.report_status + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
+            (application.report_status ? '<span>' + esc("보고: " + reportStatusLabel(application.report_status) + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
             (application.status === "approved" ? '<button class="chip" type="button" data-app-detail="' + escAttr(application.request_id) + '">상세주소 보기</button><button class="chip" type="button" data-submit-report="' + escAttr(application.id) + '">방문/견적 보고</button>' : '') +
             '</li>';
         }).join("");
@@ -1899,7 +1899,7 @@
       }
 
       async function submitFieldReport(applicationId) {
-        var reportStatus = window.prompt("보고 상태를 입력하세요: visited, quoted, not_closed", "quoted");
+        var reportStatus = window.prompt("보고 상태를 입력하세요: 견적 제출, 방문 완료, 미성사", "견적 제출");
         if (reportStatus === null) return;
         var estimateAmount = window.prompt("견적 금액 또는 조건을 입력하세요.", "");
         if (estimateAmount === null) return;
@@ -1914,7 +1914,7 @@
             body: JSON.stringify({
               action: "report",
               application_id: applicationId,
-              report_status: reportStatus,
+              report_status: normalizeReportStatus(reportStatus),
               estimate_amount: estimateAmount,
               report_text: reportText
             })
@@ -2251,6 +2251,20 @@
         var months = Math.floor(days / 30);
         if (months < 12) return months + "개월 전";
         return Math.floor(months / 12) + "년 전";
+      }
+
+      function normalizeReportStatus(value) {
+        var text = String(value || "").trim();
+        if (text === "방문 완료") return "visited";
+        if (text === "미성사") return "not_closed";
+        return "quoted";
+      }
+
+      function reportStatusLabel(value) {
+        if (value === "visited") return "방문 완료";
+        if (value === "quoted") return "견적 제출";
+        if (value === "not_closed") return "미성사";
+        return value || "-";
       }
 
       function escAttr(value) {

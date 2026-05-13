@@ -5,7 +5,7 @@ module.exports = async (req, res) => {
 
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "GET") {
-    return res.status(405).json({ ok: false, message: "Method not allowed." });
+    return res.status(405).json({ ok: false, message: "허용되지 않는 요청 방식입니다." });
   }
 
   return res.status(200).json({
