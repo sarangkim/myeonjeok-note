@@ -695,7 +695,6 @@
         <span>주소, 층, 호를 고르면 전유·공용 면적을 바로 정리합니다.</span>
       </div>
       <div class="top-actions">
-        <div class="badge">새 독립 프로젝트</div>
         <button class="account-button" id="accountButton" type="button" aria-label="계정 메뉴" aria-expanded="false">?</button>
         <div class="account-menu" id="accountMenu" hidden>
           <div class="account-email" id="accountEmail">로그인 필요</div>
@@ -1786,7 +1785,8 @@
           (contact ? '<span>' + esc(contact) + '</span>' : '') +
           '<span>' + esc(applicantStatsText(state.profileStats)) + '</span>' +
           '<button class="secondary" id="editProfileBtn" type="button"' + (profileForm.hidden ? '' : ' hidden') + '>프로필 수정</button>';
-        document.getElementById("editProfileBtn").addEventListener("click", function () {
+        document.getElementById("editProfileBtn").addEventListener("click", function (event) {
+          event.stopPropagation();
           profileStatus.textContent = "";
           profileForm.hidden = false;
           renderAccountProfile();
