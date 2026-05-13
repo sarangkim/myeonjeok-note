@@ -443,6 +443,24 @@
       padding: 12px;
     }
 
+    .field-form {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field-form textarea {
+      width: 100%;
+      min-height: 86px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      font: 14px var(--font);
+      line-height: 1.5;
+      padding: 10px;
+      outline: none;
+    }
+
     .map-card {
       display: grid;
       gap: 10px;
@@ -570,6 +588,19 @@
           </div>
           <div class="share-output" id="shareBox" hidden></div>
         </div>
+        <h2>현장 요청</h2>
+        <div class="field-form">
+          <input id="fieldPublicArea" placeholder="공개 위치 예: 서울 강서구 마곡동">
+          <input id="fieldCleaningType" placeholder="청소 종류 예: 사무실 정기청소">
+          <input id="fieldSpaceType" placeholder="공간 유형 예: 사무실, 상가">
+          <input id="fieldReward" placeholder="보상 조건 예: 성사 시 2배 수수료">
+          <input id="fieldDate" placeholder="희망 방문일 예: 이번 주 평일">
+          <textarea id="fieldDescription" placeholder="요청 내용을 적어주세요. 상세 주소는 승인 전 공개되지 않습니다."></textarea>
+          <button id="createFieldRequestBtn" type="button">현장 견적 요청 등록</button>
+          <button class="secondary" id="loadFieldRequestsBtn" type="button">공개 요청 보기</button>
+          <div class="note" id="fieldStatus"></div>
+          <ul class="note-list" id="fieldRequestList"></ul>
+        </div>
         <h2>최근 조회</h2>
         <ul class="note-list" id="noteList"></ul>
         <div class="note" id="emptyNote">아직 저장된 조회가 없습니다.</div>
@@ -607,6 +638,16 @@
       var authStatus = document.getElementById("authStatus");
       var myNoteList = document.getElementById("myNoteList");
       var loginForm = document.getElementById("loginForm");
+      var fieldPublicAreaInput = document.getElementById("fieldPublicArea");
+      var fieldCleaningTypeInput = document.getElementById("fieldCleaningType");
+      var fieldSpaceTypeInput = document.getElementById("fieldSpaceType");
+      var fieldRewardInput = document.getElementById("fieldReward");
+      var fieldDateInput = document.getElementById("fieldDate");
+      var fieldDescriptionInput = document.getElementById("fieldDescription");
+      var createFieldRequestBtn = document.getElementById("createFieldRequestBtn");
+      var loadFieldRequestsBtn = document.getElementById("loadFieldRequestsBtn");
+      var fieldStatus = document.getElementById("fieldStatus");
+      var fieldRequestList = document.getElementById("fieldRequestList");
 
       var state = {
         floors: [],
@@ -656,6 +697,8 @@
       loginBtn.addEventListener("click", requestLoginLink);
       googleLoginBtn.addEventListener("click", loginWithGoogle);
       logoutBtn.addEventListener("click", logout);
+      createFieldRequestBtn.addEventListener("click", createFieldRequest);
+      loadFieldRequestsBtn.addEventListener("click", loadFieldRequests);
 
       initAuth();
       loadSharedNoteFromUrl();
@@ -701,6 +744,7 @@
           renderSummary(data);
           remember(data, "층 목록");
           setCurrentResult(data);
+          prefillFieldRequest(data);
           renderMap(data);
           setStatus("층 목록을 불러왔습니다.");
         } catch (error) {
@@ -718,6 +762,7 @@
           renderFloor(data);
           remember(data, "층");
           setCurrentResult(data);
+          prefillFieldRequest(data);
           renderMap(data);
           setStatus("층 정보를 불러왔습니다.");
         } catch (error) {
@@ -753,6 +798,7 @@
           else renderFallback(data);
           remember(data, ho ? "호" : "층");
           setCurrentResult(data);
+          prefillFieldRequest(data);
           renderMap(data);
           setStatus("조회가 완료되었습니다.");
         } catch (error) {
@@ -1438,6 +1484,125 @@
         showShareLink(id);
         renderMap(note);
         setStatus("메모를 열었습니다.");
+      }
+
+      function prefillFieldRequest(data) {
+        var road = data.road || "";
+        var publicArea = publicAreaFromAddress(road || data.jibun || data.address || "");
+        if (publicArea && !fieldPublicAreaInput.value.trim()) fieldPublicAreaInput.value = publicArea;
+        if (!fieldSpaceTypeInput.value.trim()) fieldSpaceTypeInput.value = "사무실";
+      }
+
+      function publicAreaFromAddress(address) {
+        var parts = String(address || "").trim().split(/\s+/).filter(Boolean);
+        if (parts.length >= 3) return parts.slice(0, 3).join(" ");
+        return parts.join(" ");
+      }
+
+      async function createFieldRequest() {
+        if (!state.authSession) {
+          fieldStatus.textContent = "현장 요청 등록은 로그인이 필요합니다.";
+          return;
+        }
+        if (!state.currentResult) {
+          fieldStatus.textContent = "먼저 주소와 면적을 조회해주세요.";
+          return;
+        }
+
+        var result = state.currentResult || {};
+        var input = result.input || {};
+        var payload = {
+          address: input.address || addressInput.value.trim(),
+          road: result.road || "",
+          jibun: result.jibun || "",
+          floor: input.floor || floorSelect.value || "",
+          ho: input.ho || hoInput.value.trim() || "",
+          public_area: fieldPublicAreaInput.value.trim(),
+          cleaning_type: fieldCleaningTypeInput.value.trim(),
+          space_type: fieldSpaceTypeInput.value.trim(),
+          area_pyeong: result.sum && result.sum.total_pyeong ? result.sum.total_pyeong : null,
+          reward_text: fieldRewardInput.value.trim(),
+          preferred_date: fieldDateInput.value.trim(),
+          description: fieldDescriptionInput.value.trim()
+        };
+
+        if (!payload.public_area || !payload.cleaning_type) {
+          fieldStatus.textContent = "공개 위치와 청소 종류를 입력해주세요.";
+          return;
+        }
+
+        fieldStatus.textContent = "현장 요청을 등록하는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify(payload)
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "현장 요청 등록에 실패했습니다.");
+          fieldStatus.textContent = "현장 요청을 등록했습니다.";
+          loadFieldRequests();
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      async function loadFieldRequests() {
+        fieldStatus.textContent = "공개 요청을 불러오는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests");
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "공개 요청을 불러오지 못했습니다.");
+          renderFieldRequests(data.requests || []);
+          fieldStatus.textContent = "공개 요청을 불러왔습니다.";
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      function renderFieldRequests(requests) {
+        if (!requests.length) {
+          fieldRequestList.innerHTML = '<li class="note-card"><span>공개된 현장 요청이 없습니다.</span></li>';
+          return;
+        }
+
+        fieldRequestList.innerHTML = requests.map(function (request) {
+          return '<li class="note-card">' +
+            '<strong>' + esc(request.public_area || "위치 미정") + '</strong>' +
+            '<span>' + esc([request.cleaning_type, request.space_type, request.reward_text].filter(Boolean).join(" · ")) + '</span>' +
+            '<button class="chip" type="button" data-apply-request="' + escAttr(request.id) + '">방문 신청</button>' +
+            '</li>';
+        }).join("");
+
+        fieldRequestList.querySelectorAll("[data-apply-request]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            applyFieldRequest(button.getAttribute("data-apply-request"));
+          });
+        });
+      }
+
+      async function applyFieldRequest(id) {
+        if (!state.authSession) {
+          fieldStatus.textContent = "방문 신청은 로그인이 필요합니다.";
+          return;
+        }
+
+        var message = window.prompt("신청 메시지를 입력해주세요.", "제가 방문해서 견적을 확인할 수 있습니다.");
+        if (message === null) return;
+
+        fieldStatus.textContent = "방문 신청을 보내는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ action: "apply", request_id: id, message: message })
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "방문 신청에 실패했습니다.");
+          fieldStatus.textContent = "방문 신청을 보냈습니다.";
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
       }
 
       async function getConfig() {
