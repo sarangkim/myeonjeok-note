@@ -90,6 +90,7 @@
     }
 
     .account-button {
+      position: relative;
       display: grid;
       place-items: center;
       width: 42px;
@@ -102,6 +103,24 @@
       font-size: 14px;
       padding: 0;
       overflow: hidden;
+    }
+
+    .account-button .account-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      display: grid;
+      place-items: center;
+      min-width: 18px;
+      height: 18px;
+      border: 2px solid var(--bg);
+      border-radius: 999px;
+      background: #d84235;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1;
+      padding: 0 5px;
     }
 
     .account-button img {
@@ -1642,8 +1661,9 @@
         var user = state.authSession && state.authSession.user;
         var label = user ? (user.email || user.id || "") : "";
         var initial = label ? label.slice(0, 1).toUpperCase() : "?";
+        var notificationCount = user && state.profileStats ? Number(state.profileStats.notification_count || 0) : 0;
 
-        renderAccountButton(initial, state.profile && state.profile.avatar_url);
+        renderAccountButton(initial, state.profile && state.profile.avatar_url, notificationCount);
         accountEmail.textContent = user ? label : "로그인이 필요합니다";
         accountSummary.hidden = !user;
         if (!user) profileForm.hidden = true;
@@ -1776,6 +1796,7 @@
         var title = profile.company_name || profile.display_name || user.email || "프로필 미입력";
         var line = [profile.display_name, profile.service_area].filter(Boolean).join(" · ");
         var contact = [profile.phone, profile.bio].filter(Boolean).join(" · ");
+        var notificationText = profileNotificationText(state.profileStats);
         accountSummary.innerHTML =
           '<div class="profile-head">' +
           renderAvatar(profile.avatar_url, title) +
@@ -1783,6 +1804,7 @@
           (line ? '<span>' + esc(line) + '</span>' : '<span>프로필을 입력하면 신청자에게 더 잘 보입니다.</span>') +
           '</div></div>' +
           (contact ? '<span>' + esc(contact) + '</span>' : '') +
+          (notificationText ? '<span>' + esc(notificationText) + '</span>' : '') +
           '<span>' + esc(applicantStatsText(state.profileStats)) + '</span>' +
           '<button class="secondary" id="editProfileBtn" type="button"' + (profileForm.hidden ? '' : ' hidden') + '>프로필 수정</button>';
         document.getElementById("editProfileBtn").addEventListener("click", function (event) {
@@ -1793,10 +1815,12 @@
         });
       }
 
-      function renderAccountButton(initial, avatarUrl) {
-        accountButton.innerHTML = avatarUrl
+      function renderAccountButton(initial, avatarUrl, notificationCount) {
+        var content = avatarUrl
           ? '<img src="' + escAttr(avatarUrl) + '" alt="">'
           : esc(initial || "?");
+        var count = Number(notificationCount || 0);
+        accountButton.innerHTML = content + (count > 0 ? '<span class="account-badge">' + esc(count > 99 ? "99+" : count) + '</span>' : '');
       }
 
       function friendlyAuthError(message) {
@@ -2015,6 +2039,7 @@
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "방문 신청에 실패했습니다.");
           fieldStatus.textContent = "방문 신청을 보냈습니다.";
+          loadProfile();
           loadFieldRequests();
         } catch (error) {
           fieldStatus.textContent = error.message;
@@ -2130,6 +2155,7 @@
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "승인에 실패했습니다.");
           fieldStatus.textContent = "신청자를 승인했습니다. 승인된 신청자는 상세주소를 볼 수 있습니다.";
+          loadProfile();
           loadFieldApplications(requestId);
         } catch (error) {
           fieldStatus.textContent = error.message;
@@ -2236,6 +2262,7 @@
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "보고 저장에 실패했습니다.");
           fieldStatus.textContent = "방문/견적 보고를 저장했습니다.";
+          loadProfile();
           loadAppliedFieldRequests();
         } catch (error) {
           fieldStatus.textContent = error.message;
@@ -2589,6 +2616,18 @@
           "보고 " + Number(stats.completed_count || 0) + "건",
           "견적 제출 " + Number(stats.quoted_count || 0) + "건"
         ].join(" · ");
+      }
+
+      function profileNotificationText(stats) {
+        if (!stats) return "";
+        var parts = [];
+        if (Number(stats.pending_application_count || 0)) {
+          parts.push("새 신청 " + Number(stats.pending_application_count || 0) + "건");
+        }
+        if (Number(stats.report_needed_count || 0)) {
+          parts.push("보고 필요 " + Number(stats.report_needed_count || 0) + "건");
+        }
+        return parts.length ? "변경 사항: " + parts.join(" · ") : "";
       }
 
       function renderAvatar(avatarUrl, label) {

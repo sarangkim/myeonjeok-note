@@ -1,5 +1,6 @@
 const PROFILES_TABLE = "user_profiles";
 const APPLICATIONS_TABLE = "field_request_applications";
+const REQUESTS_TABLE = "field_requests";
 
 const PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,bio,created_at,updated_at";
 
@@ -19,6 +20,7 @@ module.exports = async (req, res) => {
       const profile = await getProfile(user);
       profile.avatar_url = getAvatarUrl(user);
       const stats = await getApplicantStats(user.id);
+      Object.assign(stats, await getNotificationStats(user.id));
       return res.status(200).json({ ok: true, profile, stats });
     }
 
@@ -42,6 +44,7 @@ module.exports = async (req, res) => {
       });
 
       const stats = await getApplicantStats(user.id);
+      Object.assign(stats, await getNotificationStats(user.id));
       const profile = updated[0] || row;
       profile.avatar_url = getAvatarUrl(user);
       return res.status(200).json({ ok: true, profile, stats });
@@ -95,6 +98,27 @@ async function getApplicantStats(userId) {
     if (row.report_status === "not_closed") stats.not_closed_count += 1;
   }
   return stats;
+}
+
+async function getNotificationStats(userId) {
+  const myRequests = await supabaseRequest(`${REQUESTS_TABLE}?requester_user_id=eq.${encodeURIComponent(userId)}&select=id`, { method: "GET" });
+  const requestIds = myRequests.map((request) => request.id).filter(Boolean);
+  let pending_application_count = 0;
+
+  if (requestIds.length) {
+    const filter = requestIds.map((id) => encodeURIComponent(id)).join(",");
+    const pendingRows = await supabaseRequest(`${APPLICATIONS_TABLE}?request_id=in.(${filter})&status=eq.pending&select=id`, { method: "GET" });
+    pending_application_count = pendingRows.length;
+  }
+
+  const approvedRows = await supabaseRequest(`${APPLICATIONS_TABLE}?applicant_user_id=eq.${encodeURIComponent(userId)}&status=eq.approved&select=id,report_status`, { method: "GET" });
+  const report_needed_count = approvedRows.filter((row) => !row.report_status).length;
+
+  return {
+    pending_application_count,
+    report_needed_count,
+    notification_count: pending_application_count + report_needed_count,
+  };
 }
 
 async function supabaseRequest(path, options) {
