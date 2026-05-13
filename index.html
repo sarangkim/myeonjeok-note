@@ -1788,6 +1788,7 @@
           return '<li class="note-card">' +
             '<strong>' + esc(applicant) + '</strong>' +
             '<span>' + esc((application.status === "approved" ? "승인됨" : "승인 대기") + " · " + formatDateTime(application.created_at)) + '</span>' +
+            '<span>' + esc(applicantStatsText(application.applicant_stats)) + '</span>' +
             '<span>' + esc(application.message || "메시지 없음") + '</span>' +
             (application.report_status ? '<span>' + esc("보고: " + reportStatusLabel(application.report_status) + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
             (application.report_text ? '<span>' + esc(application.report_text) + '</span>' : '') +
@@ -1844,7 +1845,7 @@
         fieldRequestList.innerHTML = '<li class="note-card">' +
           '<strong>' + esc(access === "owner" ? "내 요청 상세주소" : "승인된 요청 상세주소") + '</strong>' +
           '<span>' + esc(request.road || request.address || "-") + '</span>' +
-          '<span>' + esc([request.floor, request.ho].filter(Boolean).join(" / ")) + '</span>' +
+          '<span>' + esc(formatFieldLocation(request)) + '</span>' +
           '<span>' + esc(request.description || "") + '</span>' +
           '</li><li class="note-card"><button class="chip" type="button" data-load-public-requests="1">공개 요청으로 돌아가기</button></li>';
 
@@ -2265,6 +2266,34 @@
         if (value === "quoted") return "견적 제출";
         if (value === "not_closed") return "미성사";
         return value || "-";
+      }
+
+      function applicantStatsText(stats) {
+        if (!stats || !Number(stats.applied_count || 0)) return "활동 이력 없음";
+        return [
+          "누적 신청 " + Number(stats.applied_count || 0) + "건",
+          "승인 " + Number(stats.approved_count || 0) + "건",
+          "보고 " + Number(stats.completed_count || 0) + "건",
+          "견적 제출 " + Number(stats.quoted_count || 0) + "건"
+        ].join(" · ");
+      }
+
+      function formatFieldLocation(request) {
+        var floor = formatFloorLabel(request.floor);
+        var ho = String(request.ho || "").trim();
+        var parts = [];
+        if (floor) parts.push(floor);
+        parts.push(ho ? ho + "호" : "호수 미입력");
+        return parts.join(" / ");
+      }
+
+      function formatFloorLabel(value) {
+        var raw = String(value || "").trim();
+        if (!raw) return "층 미입력";
+        var parsed = parseFloorInput(raw);
+        if (parsed.gb && parsed.no) return parsed.gb + " " + parsed.no + "층";
+        if (parsed.no) return parsed.no + "층";
+        return raw;
       }
 
       function escAttr(value) {

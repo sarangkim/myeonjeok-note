@@ -48,13 +48,13 @@ module.exports = async (req, res) => {
         if (!rows.length) return res.status(403).json({ ok: false, message: "요청 작성자만 신청자를 볼 수 있습니다." });
 
         const applications = await supabaseRequest(`${APPLICATIONS_TABLE}?request_id=eq.${encodeURIComponent(requestId)}&select=${APPLICATION_COLUMNS}&order=created_at.asc`, { method: "GET" });
-        return res.status(200).json({ ok: true, applications: await attachApplicantEmails(applications) });
+        return res.status(200).json({ ok: true, applications: await attachApplicantDetails(applications) });
       }
 
       if (String(req.query.applied || "") === "1") {
         if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
         const applications = await supabaseRequest(`${APPLICATIONS_TABLE}?applicant_user_id=eq.${encodeURIComponent(user.id)}&select=${APPLICATION_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" });
-        return res.status(200).json({ ok: true, applications: await attachApplicantEmails(applications) });
+        return res.status(200).json({ ok: true, applications: await attachApplicantDetails(applications) });
       }
 
       const requests = await supabaseRequest(`${REQUESTS_TABLE}?status=eq.open&select=${PUBLIC_REQUEST_COLUMNS}&order=created_at.desc&limit=100`, { method: "GET" });
@@ -174,15 +174,50 @@ async function supabaseRequest(path, options) {
   return Array.isArray(data) ? data : [];
 }
 
-async function attachApplicantEmails(applications) {
+async function attachApplicantDetails(applications) {
   if (!applications.length) return applications;
   const uniqueIds = [...new Set(applications.map((app) => app.applicant_user_id).filter(Boolean))];
   const pairs = await Promise.all(uniqueIds.map(async (id) => [id, await getAuthUserEmail(id)]));
   const emails = new Map(pairs);
+  const stats = await getApplicantStats(uniqueIds);
   return applications.map((app) => ({
     ...app,
     applicant_email: emails.get(app.applicant_user_id) || "",
+    applicant_stats: stats.get(app.applicant_user_id) || {
+      applied_count: 0,
+      approved_count: 0,
+      completed_count: 0,
+      quoted_count: 0,
+      not_closed_count: 0,
+    },
   }));
+}
+
+async function getApplicantStats(userIds) {
+  const stats = new Map();
+  for (const id of userIds) {
+    stats.set(id, {
+      applied_count: 0,
+      approved_count: 0,
+      completed_count: 0,
+      quoted_count: 0,
+      not_closed_count: 0,
+    });
+  }
+  if (!userIds.length) return stats;
+
+  const filter = userIds.map((id) => encodeURIComponent(id)).join(",");
+  const rows = await supabaseRequest(`${APPLICATIONS_TABLE}?applicant_user_id=in.(${filter})&select=applicant_user_id,status,report_status`, { method: "GET" });
+  for (const row of rows) {
+    const current = stats.get(row.applicant_user_id);
+    if (!current) continue;
+    current.applied_count += 1;
+    if (row.status === "approved") current.approved_count += 1;
+    if (row.report_status) current.completed_count += 1;
+    if (row.report_status === "quoted") current.quoted_count += 1;
+    if (row.report_status === "not_closed") current.not_closed_count += 1;
+  }
+  return stats;
 }
 
 async function getAuthUserEmail(userId) {
