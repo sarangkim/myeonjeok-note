@@ -3,7 +3,7 @@ const APPLICATIONS_TABLE = "field_request_applications";
 
 const PUBLIC_REQUEST_COLUMNS = "id,public_area,cleaning_type,space_type,area_pyeong,reward_text,preferred_date,description,status,created_at,updated_at";
 const OWNER_REQUEST_COLUMNS = `${PUBLIC_REQUEST_COLUMNS},address,road,jibun,floor,ho,requester_user_id`;
-const APPLICATION_COLUMNS = "id,request_id,applicant_user_id,message,status,report_status,report_text,estimate_amount,completed_at,created_at,updated_at";
+const APPLICATION_COLUMNS = "id,request_id,applicant_user_id,applicant_email,message,status,report_status,report_text,estimate_amount,completed_at,created_at,updated_at";
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
       if (String(req.query.mine || "") === "1") {
         if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
         const mine = await supabaseRequest(`${REQUESTS_TABLE}?requester_user_id=eq.${encodeURIComponent(user.id)}&select=${OWNER_REQUEST_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" });
-        return res.status(200).json({ ok: true, requests: mine });
+        return res.status(200).json({ ok: true, requests: await attachApplicationCounts(mine) });
       }
 
       if (String(req.query.applications || "") === "1") {
@@ -58,7 +58,7 @@ module.exports = async (req, res) => {
       }
 
       const requests = await supabaseRequest(`${REQUESTS_TABLE}?status=eq.open&select=${PUBLIC_REQUEST_COLUMNS}&order=created_at.desc&limit=100`, { method: "GET" });
-      return res.status(200).json({ ok: true, requests });
+      return res.status(200).json({ ok: true, requests: await attachApplicationCounts(requests) });
     }
 
     if (req.method === "POST") {
@@ -72,6 +72,7 @@ module.exports = async (req, res) => {
           id: makeId(10),
           request_id: requestId,
           applicant_user_id: user.id,
+          applicant_email: clamp(user.email, 320),
           message: clamp(body.message, 1000),
           status: "pending",
         };
@@ -171,6 +172,23 @@ async function supabaseRequest(path, options) {
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.message || data?.hint || `Supabase error: ${response.status}`);
   return Array.isArray(data) ? data : [];
+}
+
+async function attachApplicationCounts(requests) {
+  if (!requests.length) return requests;
+  const ids = requests.map((request) => request.id).filter(Boolean);
+  if (!ids.length) return requests;
+
+  const filter = ids.map((id) => encodeURIComponent(id)).join(",");
+  const applications = await supabaseRequest(`${APPLICATIONS_TABLE}?request_id=in.(${filter})&select=request_id`, { method: "GET" });
+  const counts = new Map();
+  for (const application of applications) {
+    counts.set(application.request_id, (counts.get(application.request_id) || 0) + 1);
+  }
+  return requests.map((request) => ({
+    ...request,
+    application_count: counts.get(request.id) || 0,
+  }));
 }
 
 async function getAuthUser(req) {
