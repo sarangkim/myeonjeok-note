@@ -1702,10 +1702,11 @@
           '</div></div>' +
           (contact ? '<span>' + esc(contact) + '</span>' : '') +
           '<span>' + esc(applicantStatsText(state.profileStats)) + '</span>' +
-          '<button class="secondary" id="editProfileBtn" type="button">프로필 수정</button>';
+          '<button class="secondary" id="editProfileBtn" type="button"' + (profileForm.hidden ? '' : ' hidden') + '>프로필 수정</button>';
         document.getElementById("editProfileBtn").addEventListener("click", function () {
           profileStatus.textContent = "";
           profileForm.hidden = false;
+          renderAccountProfile();
         });
       }
 
