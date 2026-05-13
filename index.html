@@ -82,6 +82,58 @@
       white-space: nowrap;
     }
 
+    .top-actions {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .account-button {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      min-height: 42px;
+      border-radius: 50%;
+      border-color: var(--line);
+      background: #fff;
+      color: var(--brand-strong);
+      font-size: 14px;
+      padding: 0;
+    }
+
+    .account-button:hover,
+    .account-button[aria-expanded="true"] {
+      border-color: var(--brand);
+      background: #e5f2ee;
+    }
+
+    .account-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 20;
+      display: grid;
+      gap: 8px;
+      width: min(300px, calc(100vw - 28px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      padding: 12px;
+    }
+
+    .account-menu[hidden] {
+      display: none;
+    }
+
+    .account-email {
+      overflow-wrap: anywhere;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
     .search-panel {
       display: grid;
       gap: 14px;
@@ -380,6 +432,7 @@
     }
 
     .note-card span {
+      display: block;
       color: var(--muted);
       font-size: 12px;
     }
@@ -491,15 +544,21 @@
     }
 
     @media (max-width: 860px) {
-      .topbar,
       .actions {
         align-items: stretch;
         flex-direction: column;
       }
 
-      .badge,
       .status {
         text-align: left;
+      }
+
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .badge {
+        display: none;
       }
 
       .search-grid,
@@ -527,7 +586,17 @@
         <h1>면적노트</h1>
         <span>주소, 층, 호를 고르면 전유·공용 면적을 바로 정리합니다.</span>
       </div>
-      <div class="badge">새 독립 프로젝트</div>
+      <div class="top-actions">
+        <div class="badge">새 독립 프로젝트</div>
+        <button class="account-button" id="accountButton" type="button" aria-label="계정 메뉴" aria-expanded="false">?</button>
+        <div class="account-menu" id="accountMenu" hidden>
+          <div class="account-email" id="accountEmail">로그인 필요</div>
+          <button id="topGoogleLoginBtn" type="button">Google로 로그인</button>
+          <input id="topLoginEmail" type="email" placeholder="이메일 주소">
+          <button class="secondary" id="topLoginBtn" type="button">로그인 링크 받기</button>
+          <button class="secondary" id="topLogoutBtn" type="button" hidden>로그아웃</button>
+        </div>
+      </div>
     </header>
 
     <form class="search-panel" id="form">
@@ -562,7 +631,7 @@
       <aside class="note-panel">
         <h2>내 메모</h2>
         <div class="memo-box">
-          <div id="loginForm">
+          <div id="loginForm" hidden>
             <button id="googleLoginBtn" type="button">Google로 로그인</button>
             <div class="note">또는 이메일 링크로 로그인</div>
             <input id="loginEmail" type="email" placeholder="이메일 주소">
@@ -640,6 +709,13 @@
       var authStatus = document.getElementById("authStatus");
       var myNoteList = document.getElementById("myNoteList");
       var loginForm = document.getElementById("loginForm");
+      var accountButton = document.getElementById("accountButton");
+      var accountMenu = document.getElementById("accountMenu");
+      var accountEmail = document.getElementById("accountEmail");
+      var topLoginEmailInput = document.getElementById("topLoginEmail");
+      var topLoginBtn = document.getElementById("topLoginBtn");
+      var topGoogleLoginBtn = document.getElementById("topGoogleLoginBtn");
+      var topLogoutBtn = document.getElementById("topLogoutBtn");
       var fieldPublicAreaInput = document.getElementById("fieldPublicArea");
       var fieldCleaningTypeInput = document.getElementById("fieldCleaningType");
       var fieldSpaceTypeInput = document.getElementById("fieldSpaceType");
@@ -701,6 +777,10 @@
       loginBtn.addEventListener("click", requestLoginLink);
       googleLoginBtn.addEventListener("click", loginWithGoogle);
       logoutBtn.addEventListener("click", logout);
+      accountButton.addEventListener("click", toggleAccountMenu);
+      topLoginBtn.addEventListener("click", requestLoginLink);
+      topGoogleLoginBtn.addEventListener("click", loginWithGoogle);
+      topLogoutBtn.addEventListener("click", logout);
       createFieldRequestBtn.addEventListener("click", createFieldRequest);
       loadFieldRequestsBtn.addEventListener("click", loadFieldRequests);
       loadMyFieldRequestsBtn.addEventListener("click", loadMyFieldRequests);
@@ -1336,10 +1416,10 @@
           return;
         }
 
-        var email = loginEmailInput.value.trim();
+        var email = (topLoginEmailInput.value || loginEmailInput.value).trim();
         if (!email) {
           authStatus.textContent = "이메일을 입력해주세요.";
-          loginEmailInput.focus();
+          topLoginEmailInput.focus();
           return;
         }
 
@@ -1389,13 +1469,30 @@
 
       function updateAuthUi() {
         var user = state.authSession && state.authSession.user;
-        logoutBtn.hidden = !user;
-        loginForm.hidden = !!user;
+        var label = user ? (user.email || user.id || "") : "";
+        var initial = label ? label.slice(0, 1).toUpperCase() : "?";
+
+        accountButton.textContent = initial;
+        accountEmail.textContent = user ? label : "로그인이 필요합니다";
+        topGoogleLoginBtn.hidden = !!user;
+        topLoginEmailInput.hidden = !!user;
+        topLoginBtn.hidden = !!user;
+        topLogoutBtn.hidden = !user;
+        logoutBtn.hidden = true;
+        loginForm.hidden = true;
         loginBtn.disabled = !!user;
         googleLoginBtn.disabled = !!user;
+        topLoginBtn.disabled = !!user;
+        topGoogleLoginBtn.disabled = !!user;
         authStatus.textContent = user
           ? "로그인됨: " + (user.email || user.id)
           : "로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.";
+      }
+
+      function toggleAccountMenu() {
+        var nextHidden = !accountMenu.hidden;
+        accountMenu.hidden = nextHidden;
+        accountButton.setAttribute("aria-expanded", String(!nextHidden));
       }
 
       function friendlyAuthError(message) {
@@ -1573,7 +1670,7 @@
         }
 
         fieldRequestList.innerHTML = requests.map(function (request) {
-          var meta = [formatDateTime(request.created_at), "신청 " + Number(request.application_count || 0) + "명"].filter(Boolean).join(" · ");
+          var meta = ["등록 " + formatDateTime(request.created_at), formatRelativeTime(request.created_at), "신청 " + Number(request.application_count || 0) + "명"].filter(Boolean).join(" · ");
           return '<li class="note-card">' +
             '<strong>' + esc(request.public_area || "위치 미정") + '</strong>' +
             '<span>' + esc(meta) + '</span>' +
@@ -1645,7 +1742,7 @@
         }
 
         fieldRequestList.innerHTML = requests.map(function (request) {
-          var meta = [formatDateTime(request.created_at), "신청 " + Number(request.application_count || 0) + "명"].filter(Boolean).join(" · ");
+          var meta = ["등록 " + formatDateTime(request.created_at), formatRelativeTime(request.created_at), "신청 " + Number(request.application_count || 0) + "명"].filter(Boolean).join(" · ");
           return '<li class="note-card">' +
             '<strong>' + esc(request.public_area || request.road || "위치 미정") + '</strong>' +
             '<span>' + esc(meta) + '</span>' +
@@ -2137,6 +2234,23 @@
           hour: "2-digit",
           minute: "2-digit"
         });
+      }
+
+      function formatRelativeTime(value) {
+        if (!value) return "";
+        var date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "";
+        var diffMs = Date.now() - date.getTime();
+        var minutes = Math.max(0, Math.floor(diffMs / 60000));
+        if (minutes < 1) return "방금 전";
+        if (minutes < 60) return minutes + "분 전";
+        var hours = Math.floor(minutes / 60);
+        if (hours < 24) return hours + "시간 전";
+        var days = Math.floor(hours / 24);
+        if (days < 30) return days + "일 전";
+        var months = Math.floor(days / 30);
+        if (months < 12) return months + "개월 전";
+        return Math.floor(months / 12) + "년 전";
       }
 
       function escAttr(value) {
