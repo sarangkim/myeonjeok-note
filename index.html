@@ -348,6 +348,33 @@
       align-items: start;
     }
 
+    .workspace.no-results {
+      grid-template-columns: 1fr;
+    }
+
+    .workspace.no-results .results {
+      display: none;
+    }
+
+    .workspace.no-results .note-panel {
+      position: static;
+    }
+
+    .workspace.no-results .side-tabs {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .workspace.no-results .field-create:not([hidden]) {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .workspace.no-results .field-create textarea,
+    .workspace.no-results .field-create button {
+      grid-column: 1 / -1;
+    }
+
     .results,
     .note-panel {
       display: grid;
@@ -695,6 +722,11 @@
         grid-template-columns: 1fr;
       }
 
+      .workspace.no-results .side-tabs,
+      .workspace.no-results .field-create:not([hidden]) {
+        grid-template-columns: 1fr 1fr;
+      }
+
       .button-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -762,7 +794,7 @@
       </div>
     </form>
 
-    <div class="workspace">
+    <div class="workspace no-results" id="workspace">
       <main class="results" id="results"></main>
       <aside class="note-panel">
         <div class="side-tabs">
@@ -845,6 +877,7 @@
       var floorBtn = document.getElementById("floorBtn");
       var resetBtn = document.getElementById("resetBtn");
       var statusEl = document.getElementById("status");
+      var workspaceEl = document.getElementById("workspace");
       var resultsEl = document.getElementById("results");
       var noteList = document.getElementById("noteList");
       var emptyNote = document.getElementById("emptyNote");
@@ -927,6 +960,7 @@
         setFloors([]);
         setStatus("");
         resultsEl.innerHTML = "";
+        updateWorkspaceLayout();
         addressInput.focus();
       });
 
@@ -963,9 +997,11 @@
           selectSideView(button.getAttribute("data-side-view"));
         });
       });
+      new MutationObserver(updateWorkspaceLayout).observe(resultsEl, { childList: true });
 
       initAuth();
       loadSharedNoteFromUrl();
+      updateWorkspaceLayout();
 
       async function requestArea(params) {
         setBusy(true);
@@ -1097,6 +1133,12 @@
 
       function showLoading() {
         resultsEl.innerHTML = '<section class="section loading" aria-live="polite"><div class="spinner"></div><div><strong>공공데이터를 불러오는 중입니다</strong><div class="note">건축물대장 데이터 양에 따라 잠시 걸릴 수 있습니다.</div></div></section>';
+        updateWorkspaceLayout();
+      }
+
+      function updateWorkspaceLayout() {
+        var hasResults = !!(resultsEl && resultsEl.children.length);
+        workspaceEl.classList.toggle("no-results", !hasResults);
       }
 
       function hasPrefetch(address) {
