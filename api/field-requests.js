@@ -179,13 +179,14 @@ async function supabaseRequest(path, options) {
 async function attachApplicantDetails(applications) {
   if (!applications.length) return applications;
   const uniqueIds = [...new Set(applications.map((app) => app.applicant_user_id).filter(Boolean))];
-  const pairs = await Promise.all(uniqueIds.map(async (id) => [id, await getAuthUserEmail(id)]));
-  const emails = new Map(pairs);
+  const authPairs = await Promise.all(uniqueIds.map(async (id) => [id, await getAuthUserSummary(id)]));
+  const authUsers = new Map(authPairs);
   const stats = await getApplicantStats(uniqueIds);
   const profiles = await getProfiles(uniqueIds);
   return applications.map((app) => ({
     ...app,
-    applicant_email: emails.get(app.applicant_user_id) || "",
+    applicant_email: authUsers.get(app.applicant_user_id)?.email || "",
+    applicant_avatar_url: authUsers.get(app.applicant_user_id)?.avatar_url || "",
     applicant_profile: profiles.get(app.applicant_user_id) || null,
     applicant_stats: stats.get(app.applicant_user_id) || {
       applied_count: 0,
@@ -238,7 +239,7 @@ async function getProfiles(userIds) {
   return profiles;
 }
 
-async function getAuthUserEmail(userId) {
+async function getAuthUserSummary(userId) {
   const base = String(process.env.SUPABASE_URL || "").replace(/\/+$/, "");
   const response = await fetch(`${base}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
     headers: {
@@ -246,9 +247,13 @@ async function getAuthUserEmail(userId) {
       Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
     },
   });
-  if (!response.ok) return "";
+  if (!response.ok) return { email: "", avatar_url: "" };
   const user = await response.json();
-  return user?.email || "";
+  const metadata = user?.user_metadata || {};
+  return {
+    email: user?.email || "",
+    avatar_url: metadata.avatar_url || metadata.picture || "",
+  };
 }
 
 async function attachApplicationCounts(requests) {

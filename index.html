@@ -101,6 +101,13 @@
       color: var(--brand-strong);
       font-size: 14px;
       padding: 0;
+      overflow: hidden;
+    }
+
+    .account-button img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     .account-button:hover,
@@ -141,6 +148,33 @@
       border-radius: 6px;
       background: #fbfcfb;
       padding: 9px;
+    }
+
+    .profile-head {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+    }
+
+    .profile-avatar {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: #e5f2ee;
+      color: var(--brand-strong);
+      font-size: 13px;
+      font-weight: 850;
+      overflow: hidden;
+    }
+
+    .profile-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     .account-summary strong {
@@ -1545,7 +1579,7 @@
         var label = user ? (user.email || user.id || "") : "";
         var initial = label ? label.slice(0, 1).toUpperCase() : "?";
 
-        accountButton.textContent = initial;
+        renderAccountButton(initial, state.profile && state.profile.avatar_url);
         accountEmail.textContent = user ? label : "로그인이 필요합니다";
         accountSummary.hidden = !user;
         profileForm.hidden = !user;
@@ -1630,6 +1664,7 @@
         var user = state.authSession && state.authSession.user;
         if (!user) {
           accountSummary.innerHTML = "";
+          renderAccountButton("?", "");
           return;
         }
 
@@ -1638,10 +1673,19 @@
         var line = [profile.display_name, profile.service_area].filter(Boolean).join(" · ");
         var contact = [profile.phone, profile.bio].filter(Boolean).join(" · ");
         accountSummary.innerHTML =
-          '<strong>' + esc(title) + '</strong>' +
+          '<div class="profile-head">' +
+          renderAvatar(profile.avatar_url, title) +
+          '<div><strong>' + esc(title) + '</strong>' +
           (line ? '<span>' + esc(line) + '</span>' : '<span>프로필을 입력하면 신청자에게 더 잘 보입니다.</span>') +
+          '</div></div>' +
           (contact ? '<span>' + esc(contact) + '</span>' : '') +
           '<span>' + esc(applicantStatsText(state.profileStats)) + '</span>';
+      }
+
+      function renderAccountButton(initial, avatarUrl) {
+        accountButton.innerHTML = avatarUrl
+          ? '<img src="' + escAttr(avatarUrl) + '" alt="">'
+          : esc(initial || "?");
       }
 
       function friendlyAuthError(message) {
@@ -1938,8 +1982,11 @@
           var profileTitle = profile.company_name || profile.display_name || "";
           var profileLine = [profile.display_name, profile.service_area, profile.phone].filter(Boolean).join(" · ");
           return '<li class="note-card">' +
-            '<strong>' + esc(applicant) + '</strong>' +
+            '<div class="profile-head">' +
+            renderAvatar(application.applicant_avatar_url, profileTitle || applicant) +
+            '<div><strong>' + esc(applicant) + '</strong>' +
             (profileTitle ? '<span>' + esc("프로필: " + profileTitle) + '</span>' : '<span>프로필 미입력</span>') +
+            '</div></div>' +
             (profileLine ? '<span>' + esc(profileLine) + '</span>' : '') +
             (profile.bio ? '<span>' + esc(profile.bio) + '</span>' : '') +
             '<span>' + esc((application.status === "approved" ? "승인됨" : "승인 대기") + " · " + formatDateTime(application.created_at)) + '</span>' +
@@ -2431,6 +2478,15 @@
           "보고 " + Number(stats.completed_count || 0) + "건",
           "견적 제출 " + Number(stats.quoted_count || 0) + "건"
         ].join(" · ");
+      }
+
+      function renderAvatar(avatarUrl, label) {
+        var initial = String(label || "?").trim().slice(0, 1).toUpperCase() || "?";
+        return '<span class="profile-avatar">' + (
+          avatarUrl
+            ? '<img src="' + escAttr(avatarUrl) + '" alt="">'
+            : esc(initial)
+        ) + '</span>';
       }
 
       function formatFieldLocation(request) {

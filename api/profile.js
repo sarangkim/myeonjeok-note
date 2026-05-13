@@ -17,6 +17,7 @@ module.exports = async (req, res) => {
 
     if (req.method === "GET") {
       const profile = await getProfile(user);
+      profile.avatar_url = getAvatarUrl(user);
       const stats = await getApplicantStats(user.id);
       return res.status(200).json({ ok: true, profile, stats });
     }
@@ -41,7 +42,9 @@ module.exports = async (req, res) => {
       });
 
       const stats = await getApplicantStats(user.id);
-      return res.status(200).json({ ok: true, profile: updated[0], stats });
+      const profile = updated[0] || row;
+      profile.avatar_url = getAvatarUrl(user);
+      return res.status(200).json({ ok: true, profile, stats });
     }
 
     return res.status(405).json({ ok: false, message: "허용되지 않는 요청 방식입니다." });
@@ -66,7 +69,13 @@ async function getProfile(user) {
     phone: "",
     service_area: "",
     bio: "",
+    avatar_url: getAvatarUrl(user),
   };
+}
+
+function getAvatarUrl(user) {
+  const metadata = user?.user_metadata || {};
+  return metadata.avatar_url || metadata.picture || "";
 }
 
 async function getApplicantStats(userId) {
