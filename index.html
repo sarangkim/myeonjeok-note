@@ -876,6 +876,10 @@
       topGoogleLoginBtn.addEventListener("click", loginWithGoogle);
       topLogoutBtn.addEventListener("click", logout);
       saveProfileBtn.addEventListener("click", saveProfile);
+      document.addEventListener("click", closeAccountMenuOnOutsideClick);
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") closeAccountMenu();
+      });
       createFieldRequestBtn.addEventListener("click", createFieldRequest);
       loadFieldRequestsBtn.addEventListener("click", loadFieldRequests);
       loadMyFieldRequestsBtn.addEventListener("click", loadMyFieldRequests);
@@ -1582,7 +1586,7 @@
         renderAccountButton(initial, state.profile && state.profile.avatar_url);
         accountEmail.textContent = user ? label : "로그인이 필요합니다";
         accountSummary.hidden = !user;
-        profileForm.hidden = !user;
+        if (!user) profileForm.hidden = true;
         topGoogleLoginBtn.hidden = !!user;
         topLoginEmailInput.hidden = !!user;
         topLoginBtn.hidden = !!user;
@@ -1600,9 +1604,25 @@
       }
 
       function toggleAccountMenu() {
-        var nextHidden = !accountMenu.hidden;
-        accountMenu.hidden = nextHidden;
-        accountButton.setAttribute("aria-expanded", String(!nextHidden));
+        if (accountMenu.hidden) openAccountMenu();
+        else closeAccountMenu();
+      }
+
+      function openAccountMenu() {
+        accountMenu.hidden = false;
+        accountButton.setAttribute("aria-expanded", "true");
+      }
+
+      function closeAccountMenu() {
+        accountMenu.hidden = true;
+        accountButton.setAttribute("aria-expanded", "false");
+        profileForm.hidden = true;
+      }
+
+      function closeAccountMenuOnOutsideClick(event) {
+        if (accountMenu.hidden) return;
+        if (accountMenu.contains(event.target) || accountButton.contains(event.target)) return;
+        closeAccountMenu();
       }
 
       async function loadProfile() {
@@ -1614,6 +1634,7 @@
           state.profile = data.profile || null;
           state.profileStats = data.stats || null;
           fillProfileForm();
+          profileForm.hidden = true;
           renderAccountProfile();
         } catch (error) {
           profileStatus.textContent = error.message;
@@ -1644,6 +1665,7 @@
           state.profile = data.profile || null;
           state.profileStats = data.stats || null;
           fillProfileForm();
+          profileForm.hidden = true;
           renderAccountProfile();
           profileStatus.textContent = "프로필을 저장했습니다.";
         } catch (error) {
@@ -1679,7 +1701,12 @@
           (line ? '<span>' + esc(line) + '</span>' : '<span>프로필을 입력하면 신청자에게 더 잘 보입니다.</span>') +
           '</div></div>' +
           (contact ? '<span>' + esc(contact) + '</span>' : '') +
-          '<span>' + esc(applicantStatsText(state.profileStats)) + '</span>';
+          '<span>' + esc(applicantStatsText(state.profileStats)) + '</span>' +
+          '<button class="secondary" id="editProfileBtn" type="button">프로필 수정</button>';
+        document.getElementById("editProfileBtn").addEventListener("click", function () {
+          profileStatus.textContent = "";
+          profileForm.hidden = false;
+        });
       }
 
       function renderAccountButton(initial, avatarUrl) {
