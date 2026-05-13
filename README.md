@@ -26,6 +26,10 @@ npm run dev
 
 Supabase SQL Editor에서 `supabase-schema.sql`을 한 번 실행한 뒤, Vercel 환경변수에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`를 추가하세요. 공유 메모는 로그인 없이 보기 링크로 열람되고, 수정 권한은 작성 브라우저에 저장되는 수정 토큰으로 처리됩니다.
 
+## 로그인
+
+Supabase Auth를 사용합니다. 이메일 매직링크와 Google 로그인을 지원합니다. Google 로그인은 Supabase Authentication Providers에서 Google을 활성화하고, Supabase가 안내하는 callback URL을 Google Cloud OAuth 클라이언트의 승인된 리디렉션 URI에 등록해야 합니다. Supabase URL Configuration의 Site URL은 `https://myeonjeok-note.vercel.app`, Redirect URLs는 `https://myeonjeok-note.vercel.app/*`로 설정하세요.
+
 ## 카카오맵
 
 Kakao Developers에서 Web 플랫폼 도메인 `https://myeonjeok-note.vercel.app`을 등록하고, Kakao Map API를 활성화한 뒤 JavaScript 키를 Vercel 환경변수 `KAKAO_MAP_JS_KEY`로 추가하세요. 키가 없으면 앱은 지도 대신 카카오맵 검색 링크만 표시합니다.

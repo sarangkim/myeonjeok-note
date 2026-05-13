@@ -545,6 +545,8 @@
         <h2>내 메모</h2>
         <div class="memo-box">
           <div id="loginForm">
+            <button id="googleLoginBtn" type="button">Google로 로그인</button>
+            <div class="note">또는 이메일 링크로 로그인</div>
             <input id="loginEmail" type="email" placeholder="이메일 주소">
             <div class="button-row">
               <button id="loginBtn" type="button">로그인 링크 받기</button>
@@ -600,6 +602,7 @@
       var notePasswordInput = document.getElementById("notePassword");
       var loginEmailInput = document.getElementById("loginEmail");
       var loginBtn = document.getElementById("loginBtn");
+      var googleLoginBtn = document.getElementById("googleLoginBtn");
       var logoutBtn = document.getElementById("logoutBtn");
       var authStatus = document.getElementById("authStatus");
       var myNoteList = document.getElementById("myNoteList");
@@ -651,6 +654,7 @@
         if (!protectNoteInput.checked) notePasswordInput.value = "";
       });
       loginBtn.addEventListener("click", requestLoginLink);
+      googleLoginBtn.addEventListener("click", loginWithGoogle);
       logoutBtn.addEventListener("click", logout);
 
       initAuth();
@@ -1302,6 +1306,28 @@
         authStatus.textContent = result.error ? friendlyAuthError(result.error.message) : "이메일로 로그인 링크를 보냈습니다.";
       }
 
+      async function loginWithGoogle() {
+        if (state.authSession && state.authSession.user) {
+          updateAuthUi();
+          authStatus.textContent = "이미 로그인되어 있습니다.";
+          return;
+        }
+
+        var config = await getConfig();
+        var loaded = await loadSupabaseAuth(config);
+        if (!loaded) {
+          authStatus.textContent = "로그인 설정이 아직 준비되지 않았습니다.";
+          return;
+        }
+
+        authStatus.textContent = "Google 로그인으로 이동합니다.";
+        var result = await state.supabaseClient.auth.signInWithOAuth({
+          provider: "google",
+          options: { redirectTo: window.location.origin + window.location.pathname }
+        });
+        if (result.error) authStatus.textContent = friendlyAuthError(result.error.message);
+      }
+
       async function logout() {
         if (state.supabaseClient) await state.supabaseClient.auth.signOut();
         state.authSession = null;
@@ -1314,6 +1340,7 @@
         logoutBtn.hidden = !user;
         loginForm.hidden = !!user;
         loginBtn.disabled = !!user;
+        googleLoginBtn.disabled = !!user;
         authStatus.textContent = user
           ? "로그인됨: " + (user.email || user.id)
           : "로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.";
