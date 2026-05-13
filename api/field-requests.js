@@ -17,6 +17,22 @@ module.exports = async (req, res) => {
     const user = await getAuthUser(req);
 
     if (req.method === "GET") {
+      if (String(req.query.detail || "") === "1") {
+        if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
+        const requestId = cleanId(req.query.request_id);
+        if (!requestId) return res.status(400).json({ ok: false, message: "request_id is required." });
+
+        const ownerRows = await supabaseRequest(`${REQUESTS_TABLE}?id=eq.${encodeURIComponent(requestId)}&requester_user_id=eq.${encodeURIComponent(user.id)}&select=${OWNER_REQUEST_COLUMNS}`, { method: "GET" });
+        if (ownerRows.length) return res.status(200).json({ ok: true, request: ownerRows[0], access: "owner" });
+
+        const approvedRows = await supabaseRequest(`${APPLICATIONS_TABLE}?request_id=eq.${encodeURIComponent(requestId)}&applicant_user_id=eq.${encodeURIComponent(user.id)}&status=eq.approved&select=id`, { method: "GET" });
+        if (!approvedRows.length) return res.status(403).json({ ok: false, message: "Approved applicants only." });
+
+        const rows = await supabaseRequest(`${REQUESTS_TABLE}?id=eq.${encodeURIComponent(requestId)}&select=${OWNER_REQUEST_COLUMNS}`, { method: "GET" });
+        if (!rows.length) return res.status(404).json({ ok: false, message: "Request not found." });
+        return res.status(200).json({ ok: true, request: rows[0], access: "approved_applicant" });
+      }
+
       if (String(req.query.mine || "") === "1") {
         if (!user) return res.status(401).json({ ok: false, message: "Login is required." });
         const mine = await supabaseRequest(`${REQUESTS_TABLE}?requester_user_id=eq.${encodeURIComponent(user.id)}&select=${OWNER_REQUEST_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" });

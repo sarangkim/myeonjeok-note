@@ -598,6 +598,7 @@
           <textarea id="fieldDescription" placeholder="요청 내용을 적어주세요. 상세 주소는 승인 전 공개되지 않습니다."></textarea>
           <button id="createFieldRequestBtn" type="button">현장 견적 요청 등록</button>
           <button class="secondary" id="loadFieldRequestsBtn" type="button">공개 요청 보기</button>
+          <button class="secondary" id="loadMyFieldRequestsBtn" type="button">내 요청 보기</button>
           <div class="note" id="fieldStatus"></div>
           <ul class="note-list" id="fieldRequestList"></ul>
         </div>
@@ -646,6 +647,7 @@
       var fieldDescriptionInput = document.getElementById("fieldDescription");
       var createFieldRequestBtn = document.getElementById("createFieldRequestBtn");
       var loadFieldRequestsBtn = document.getElementById("loadFieldRequestsBtn");
+      var loadMyFieldRequestsBtn = document.getElementById("loadMyFieldRequestsBtn");
       var fieldStatus = document.getElementById("fieldStatus");
       var fieldRequestList = document.getElementById("fieldRequestList");
 
@@ -699,6 +701,7 @@
       logoutBtn.addEventListener("click", logout);
       createFieldRequestBtn.addEventListener("click", createFieldRequest);
       loadFieldRequestsBtn.addEventListener("click", loadFieldRequests);
+      loadMyFieldRequestsBtn.addEventListener("click", loadMyFieldRequests);
 
       initAuth();
       loadSharedNoteFromUrl();
@@ -1571,12 +1574,18 @@
             '<strong>' + esc(request.public_area || "위치 미정") + '</strong>' +
             '<span>' + esc([request.cleaning_type, request.space_type, request.reward_text].filter(Boolean).join(" · ")) + '</span>' +
             '<button class="chip" type="button" data-apply-request="' + escAttr(request.id) + '">방문 신청</button>' +
+            '<button class="chip" type="button" data-detail-request="' + escAttr(request.id) + '">상세 보기</button>' +
             '</li>';
         }).join("");
 
         fieldRequestList.querySelectorAll("[data-apply-request]").forEach(function (button) {
           button.addEventListener("click", function () {
             applyFieldRequest(button.getAttribute("data-apply-request"));
+          });
+        });
+        fieldRequestList.querySelectorAll("[data-detail-request]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            loadFieldRequestDetail(button.getAttribute("data-detail-request"));
           });
         });
       }
@@ -1603,6 +1612,136 @@
         } catch (error) {
           fieldStatus.textContent = error.message;
         }
+      }
+
+      async function loadMyFieldRequests() {
+        if (!state.authSession) {
+          fieldStatus.textContent = "내 요청 보기는 로그인이 필요합니다.";
+          return;
+        }
+
+        fieldStatus.textContent = "내 요청을 불러오는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests?mine=1", { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "내 요청을 불러오지 못했습니다.");
+          renderMyFieldRequests(data.requests || []);
+          fieldStatus.textContent = "내 요청을 불러왔습니다.";
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      function renderMyFieldRequests(requests) {
+        if (!requests.length) {
+          fieldRequestList.innerHTML = '<li class="note-card"><span>내가 등록한 현장 요청이 없습니다.</span></li>';
+          return;
+        }
+
+        fieldRequestList.innerHTML = requests.map(function (request) {
+          return '<li class="note-card">' +
+            '<strong>' + esc(request.public_area || request.road || "위치 미정") + '</strong>' +
+            '<span>' + esc([request.cleaning_type, request.status, request.reward_text].filter(Boolean).join(" · ")) + '</span>' +
+            '<button class="chip" type="button" data-owner-detail="' + escAttr(request.id) + '">상세주소 보기</button>' +
+            '<button class="chip" type="button" data-load-apps="' + escAttr(request.id) + '">신청자 보기</button>' +
+            '</li>';
+        }).join("");
+
+        fieldRequestList.querySelectorAll("[data-owner-detail]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            loadFieldRequestDetail(button.getAttribute("data-owner-detail"));
+          });
+        });
+        fieldRequestList.querySelectorAll("[data-load-apps]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            loadFieldApplications(button.getAttribute("data-load-apps"));
+          });
+        });
+      }
+
+      async function loadFieldApplications(requestId) {
+        fieldStatus.textContent = "신청자를 불러오는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests?applications=1&request_id=" + encodeURIComponent(requestId), { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "신청자를 불러오지 못했습니다.");
+          renderFieldApplications(requestId, data.applications || []);
+          fieldStatus.textContent = "신청자를 불러왔습니다.";
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      function renderFieldApplications(requestId, applications) {
+        if (!applications.length) {
+          fieldRequestList.innerHTML = '<li class="note-card"><span>아직 신청자가 없습니다.</span></li>';
+          return;
+        }
+
+        fieldRequestList.innerHTML = applications.map(function (application) {
+          return '<li class="note-card">' +
+            '<strong>' + esc(application.status === "approved" ? "승인됨" : "승인 대기") + '</strong>' +
+            '<span>' + esc(application.message || "메시지 없음") + '</span>' +
+            (application.status === "approved" ? '' : '<button class="chip" type="button" data-approve-app="' + escAttr(application.id) + '">승인</button>') +
+            '</li>';
+        }).join("") + '<li class="note-card"><button class="chip" type="button" data-back-my-requests="1">내 요청으로 돌아가기</button></li>';
+
+        fieldRequestList.querySelectorAll("[data-approve-app]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            approveFieldApplication(button.getAttribute("data-approve-app"), requestId);
+          });
+        });
+        fieldRequestList.querySelectorAll("[data-back-my-requests]").forEach(function (button) {
+          button.addEventListener("click", loadMyFieldRequests);
+        });
+      }
+
+      async function approveFieldApplication(applicationId, requestId) {
+        fieldStatus.textContent = "신청자를 승인하는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests", {
+            method: "PATCH",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ action: "approve", application_id: applicationId })
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "승인에 실패했습니다.");
+          fieldStatus.textContent = "신청자를 승인했습니다. 승인된 신청자는 상세주소를 볼 수 있습니다.";
+          loadFieldApplications(requestId);
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      async function loadFieldRequestDetail(requestId) {
+        if (!state.authSession) {
+          fieldStatus.textContent = "상세주소 보기는 로그인이 필요합니다.";
+          return;
+        }
+
+        fieldStatus.textContent = "상세주소를 확인하는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests?detail=1&request_id=" + encodeURIComponent(requestId), { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "상세주소를 볼 권한이 없습니다.");
+          renderFieldRequestDetail(data.request, data.access);
+          fieldStatus.textContent = "상세주소를 표시했습니다.";
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      function renderFieldRequestDetail(request, access) {
+        fieldRequestList.innerHTML = '<li class="note-card">' +
+          '<strong>' + esc(access === "owner" ? "내 요청 상세주소" : "승인된 요청 상세주소") + '</strong>' +
+          '<span>' + esc(request.road || request.address || "-") + '</span>' +
+          '<span>' + esc([request.floor, request.ho].filter(Boolean).join(" / ")) + '</span>' +
+          '<span>' + esc(request.description || "") + '</span>' +
+          '</li><li class="note-card"><button class="chip" type="button" data-load-public-requests="1">공개 요청으로 돌아가기</button></li>';
+
+        fieldRequestList.querySelectorAll("[data-load-public-requests]").forEach(function (button) {
+          button.addEventListener("click", loadFieldRequests);
+        });
       }
 
       async function getConfig() {
