@@ -194,6 +194,15 @@
       padding-top: 8px;
     }
 
+    .profile-form[hidden],
+    .side-panel[hidden],
+    .field-create[hidden],
+    .legacy-field-actions[hidden],
+    #notePassword[hidden],
+    #shareBox[hidden] {
+      display: none;
+    }
+
     .profile-form textarea {
       width: 100%;
       min-height: 70px;
@@ -484,6 +493,32 @@
       font-weight: 850;
     }
 
+    .side-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .side-tabs button {
+      min-height: 38px;
+      border-color: var(--line);
+      background: #fff;
+      color: var(--text);
+      font-size: 13px;
+      padding: 7px 9px;
+    }
+
+    .side-tabs button.active {
+      border-color: var(--brand);
+      background: var(--brand);
+      color: #fff;
+    }
+
+    .side-panel {
+      display: grid;
+      gap: 12px;
+    }
+
     .note-list {
       display: grid;
       gap: 8px;
@@ -712,52 +747,68 @@
     <div class="workspace">
       <main class="results" id="results"></main>
       <aside class="note-panel">
-        <h2>내 메모</h2>
-        <div class="memo-box">
-          <div id="loginForm" hidden>
-            <button id="googleLoginBtn" type="button">구글로 로그인</button>
-            <div class="note">또는 이메일 링크로 로그인</div>
-            <input id="loginEmail" type="email" placeholder="이메일 주소">
+        <div class="side-tabs">
+          <button class="active" type="button" data-side-view="notes">내 메모</button>
+          <button type="button" data-side-view="public">공개 요청</button>
+          <button type="button" data-side-view="mine">내 요청</button>
+          <button type="button" data-side-view="applied">내 신청</button>
+        </div>
+
+        <div class="side-panel" id="notesPanel">
+          <h2>내 메모</h2>
+          <div class="memo-box">
+            <div id="loginForm" hidden>
+              <button id="googleLoginBtn" type="button">구글로 로그인</button>
+              <div class="note">또는 이메일 링크로 로그인</div>
+              <input id="loginEmail" type="email" placeholder="이메일 주소">
+              <div class="button-row">
+                <button id="loginBtn" type="button">로그인 링크 받기</button>
+              </div>
+            </div>
+            <button class="secondary" id="logoutBtn" type="button" hidden>로그아웃</button>
+            <div class="note" id="authStatus">로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.</div>
+            <ul class="note-list" id="myNoteList"></ul>
+          </div>
+          <h2>공유 메모</h2>
+          <div class="memo-box">
+            <textarea id="memo" placeholder="조회한 면적에 대한 메모를 적어두세요."></textarea>
+            <label class="check-row">
+              <input id="protectNote" type="checkbox">
+              비밀번호로 보호
+            </label>
+            <input id="notePassword" type="password" placeholder="공유 링크 열람 비밀번호" hidden>
             <div class="button-row">
-              <button id="loginBtn" type="button">로그인 링크 받기</button>
+              <button id="saveNoteBtn" type="button">메모 저장</button>
+              <button class="secondary" id="copyLinkBtn" type="button">링크 복사</button>
+            </div>
+            <div class="share-output" id="shareBox" hidden></div>
+          </div>
+          <h2>최근 조회</h2>
+          <ul class="note-list" id="noteList"></ul>
+          <div class="note" id="emptyNote">아직 저장된 조회가 없습니다.</div>
+        </div>
+
+        <div class="side-panel" id="requestsPanel" hidden>
+          <h2 id="requestsPanelTitle">공개 요청</h2>
+          <div class="field-form">
+            <div class="field-create" id="fieldCreateBlock" hidden>
+              <input id="fieldPublicArea" placeholder="공개 위치 예: 서울 강서구 마곡동">
+              <input id="fieldCleaningType" placeholder="청소 종류 예: 사무실 정기청소">
+              <input id="fieldSpaceType" placeholder="공간 유형 예: 사무실, 상가">
+              <input id="fieldReward" placeholder="보상 조건 예: 성사 시 2배 수수료">
+              <input id="fieldDate" placeholder="희망 방문일 예: 이번 주 평일">
+              <textarea id="fieldDescription" placeholder="요청 내용을 적어주세요. 상세 주소는 승인 전 공개되지 않습니다."></textarea>
+              <button id="createFieldRequestBtn" type="button">현장 견적 요청 등록</button>
+            </div>
+            <div class="legacy-field-actions" hidden>
+              <button class="secondary" id="loadFieldRequestsBtn" type="button">공개 요청 보기</button>
+              <button class="secondary" id="loadMyFieldRequestsBtn" type="button">내 요청 보기</button>
+              <button class="secondary" id="loadAppliedFieldRequestsBtn" type="button">내 신청 보기</button>
             </div>
           </div>
-          <button class="secondary" id="logoutBtn" type="button" hidden>로그아웃</button>
-          <div class="note" id="authStatus">로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.</div>
-          <ul class="note-list" id="myNoteList"></ul>
-        </div>
-        <h2>공유 메모</h2>
-        <div class="memo-box">
-          <textarea id="memo" placeholder="조회한 면적에 대한 메모를 적어두세요."></textarea>
-          <label class="check-row">
-            <input id="protectNote" type="checkbox">
-            비밀번호로 보호
-          </label>
-          <input id="notePassword" type="password" placeholder="공유 링크 열람 비밀번호" hidden>
-          <div class="button-row">
-            <button id="saveNoteBtn" type="button">메모 저장</button>
-            <button class="secondary" id="copyLinkBtn" type="button">링크 복사</button>
-          </div>
-          <div class="share-output" id="shareBox" hidden></div>
-        </div>
-        <h2>현장 요청</h2>
-        <div class="field-form">
-          <input id="fieldPublicArea" placeholder="공개 위치 예: 서울 강서구 마곡동">
-          <input id="fieldCleaningType" placeholder="청소 종류 예: 사무실 정기청소">
-          <input id="fieldSpaceType" placeholder="공간 유형 예: 사무실, 상가">
-          <input id="fieldReward" placeholder="보상 조건 예: 성사 시 2배 수수료">
-          <input id="fieldDate" placeholder="희망 방문일 예: 이번 주 평일">
-          <textarea id="fieldDescription" placeholder="요청 내용을 적어주세요. 상세 주소는 승인 전 공개되지 않습니다."></textarea>
-          <button id="createFieldRequestBtn" type="button">현장 견적 요청 등록</button>
-          <button class="secondary" id="loadFieldRequestsBtn" type="button">공개 요청 보기</button>
-          <button class="secondary" id="loadMyFieldRequestsBtn" type="button">내 요청 보기</button>
-          <button class="secondary" id="loadAppliedFieldRequestsBtn" type="button">내 신청 보기</button>
           <div class="note" id="fieldStatus"></div>
           <ul class="note-list" id="fieldRequestList"></ul>
         </div>
-        <h2>최근 조회</h2>
-        <ul class="note-list" id="noteList"></ul>
-        <div class="note" id="emptyNote">아직 저장된 조회가 없습니다.</div>
       </aside>
     </div>
   </div>
@@ -820,6 +871,11 @@
       var loadAppliedFieldRequestsBtn = document.getElementById("loadAppliedFieldRequestsBtn");
       var fieldStatus = document.getElementById("fieldStatus");
       var fieldRequestList = document.getElementById("fieldRequestList");
+      var sideTabButtons = document.querySelectorAll("[data-side-view]");
+      var notesPanel = document.getElementById("notesPanel");
+      var requestsPanel = document.getElementById("requestsPanel");
+      var requestsPanelTitle = document.getElementById("requestsPanelTitle");
+      var fieldCreateBlock = document.getElementById("fieldCreateBlock");
 
       var state = {
         floors: [],
@@ -884,6 +940,11 @@
       loadFieldRequestsBtn.addEventListener("click", loadFieldRequests);
       loadMyFieldRequestsBtn.addEventListener("click", loadMyFieldRequests);
       loadAppliedFieldRequestsBtn.addEventListener("click", loadAppliedFieldRequests);
+      sideTabButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          selectSideView(button.getAttribute("data-side-view"));
+        });
+      });
 
       initAuth();
       loadSharedNoteFromUrl();
@@ -1625,6 +1686,28 @@
         closeAccountMenu();
       }
 
+      function selectSideView(view) {
+        sideTabButtons.forEach(function (button) {
+          button.classList.toggle("active", button.getAttribute("data-side-view") === view);
+        });
+
+        var isNotes = view === "notes";
+        notesPanel.hidden = !isNotes;
+        requestsPanel.hidden = isNotes;
+        fieldCreateBlock.hidden = view !== "mine";
+
+        if (view === "public") {
+          requestsPanelTitle.textContent = "공개 요청";
+          loadFieldRequests();
+        } else if (view === "mine") {
+          requestsPanelTitle.textContent = "내 요청";
+          loadMyFieldRequests();
+        } else if (view === "applied") {
+          requestsPanelTitle.textContent = "내 신청";
+          loadAppliedFieldRequests();
+        }
+      }
+
       async function loadProfile() {
         if (!state.authSession) return;
         try {
@@ -1865,7 +1948,7 @@
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "현장 요청 등록에 실패했습니다.");
           fieldStatus.textContent = "현장 요청을 등록했습니다.";
-          loadFieldRequests();
+          loadMyFieldRequests();
         } catch (error) {
           fieldStatus.textContent = error.message;
         }
