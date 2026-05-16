@@ -56,8 +56,16 @@ module.exports = async (req, res) => {
   }
 };
 
+function supabaseBaseUrl() {
+  return String(process.env.SUPABASE_URL || "")
+    .replace(/\\r\\n|\\n|\\r/g, "")
+    .trim()
+    .replace(/\/rest\/v1\/?$/, "")
+    .replace(/\/+$/, "");
+}
+
 function assertSupabaseEnv() {
-  if (!process.env.SUPABASE_URL) throw new Error("Supabase 주소 설정이 없습니다.");
+  if (!supabaseBaseUrl()) throw new Error("Supabase 주소 설정이 없습니다.");
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase 서비스 키 설정이 없습니다.");
 }
 
@@ -122,7 +130,7 @@ async function getNotificationStats(userId) {
 }
 
 async function supabaseRequest(path, options) {
-  const base = String(process.env.SUPABASE_URL || "").replace(/\/+$/, "");
+  const base = supabaseBaseUrl();
   const response = await fetch(`${base}/rest/v1/${path}`, {
     ...options,
     headers: {
@@ -145,7 +153,7 @@ async function getAuthUser(req) {
   const match = auth.match(/^Bearer\s+(.+)$/i);
   if (!match) return null;
 
-  const base = String(process.env.SUPABASE_URL || "").replace(/\/+$/, "");
+  const base = supabaseBaseUrl();
   const response = await fetch(`${base}/auth/v1/user`, {
     headers: {
       apikey: process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -189,3 +197,4 @@ function toKoreanError(error) {
 function clamp(value, max) {
   return String(value || "").trim().slice(0, max);
 }
+
