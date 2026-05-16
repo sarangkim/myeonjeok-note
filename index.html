@@ -473,6 +473,21 @@
       color: #9b3c17;
     }
 
+    .ho-picker-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .ho-picker-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
     .table-wrap {
       overflow-x: auto;
       border: 1px solid var(--line);
@@ -1090,7 +1105,8 @@
         supabaseClient: null,
         authSession: null,
         profile: null,
-        profileStats: null
+        profileStats: null,
+        selectedHoNorms: []
       };
 
       form.addEventListener("submit", function (event) {
@@ -1105,6 +1121,7 @@
         hoInput.value = "";
         state.prefetch = null;
         state.lastAddress = "";
+        state.selectedHoNorms = [];
         setFloors([]);
         setStatus("");
         resultsEl.innerHTML = "";
@@ -1114,6 +1131,7 @@
 
       floorSelect.addEventListener("change", function () {
         if (addressInput.value.trim() && floorSelect.value && !hoInput.value.trim()) {
+          state.selectedHoNorms = [];
           loadFloor(floorSelect.value);
         }
       });
@@ -1247,6 +1265,7 @@
           var data = hasPrefetch(address)
             ? (ho ? buildHoFromPrefetch(floor, ho) : buildFloorFromPrefetch(floor))
             : await requestArea({ address: address, floor: floor, ho: ho });
+          state.selectedHoNorms = parseHoSelection(ho);
           if (data.mode === "floor") renderFloor(data);
           else if (data.mode === "ho_breakdown" || data.mode === "multi_exposInfo_fallback") renderHoBreakdown(data);
           else renderFallback(data);
@@ -1450,7 +1469,8 @@
           renderFloorItems(data.floor_items || []),
           renderFloorExclusive(data),
           '</section>',
-          '<section class="section"><h2 class="section-title">호 목록</h2>',
+          '<section class="section" data-ho-picker-section><h2 class="section-title">호 목록</h2>',
+          renderHoPickerTools(),
           renderHoChips(data.ho_list || []),
           data.ho_list_note ? '<div class="note">' + esc(data.ho_list_note) + '</div>' : '',
           '</section>'
@@ -1528,8 +1548,9 @@
         var activeNorms = parseHoSelection(activeHo || hoInput.value);
         return '<div class="chips">' + hoList.map(function (ho) {
           var norm = normalizeHo(ho);
-          var isActive = activeNorms.length === 1 && norm === activeNorms[0];
-          var inRange = activeNorms.length > 1 && activeNorms.indexOf(norm) !== -1;
+          var isSelected = state.selectedHoNorms.indexOf(norm) !== -1;
+          var isActive = !isSelected && activeNorms.length === 1 && norm === activeNorms[0];
+          var inRange = isSelected || (activeNorms.length > 1 && activeNorms.indexOf(norm) !== -1);
           var className = isActive ? " active" : (inRange ? " in-range" : "");
           return '<button class="chip' + className + '" type="button" data-ho="' + escAttr(ho) + '">' + esc(ho + "호") + '</button>';
         }).join("") + '</div>';
@@ -1538,10 +1559,24 @@
       function renderStickyHoList(floorData, activeHo) {
         if (!floorData) return "";
         return [
-          '<section class="section"><h2 class="section-title">같은 층 호 목록</h2>',
+          '<section class="section" data-ho-picker-section><h2 class="section-title">같은 층 호 목록</h2>',
+          renderHoPickerTools(),
           renderHoChips(floorData.ho_list || [], activeHo),
           floorData.ho_list_note ? '<div class="note">' + esc(floorData.ho_list_note) + '</div>' : '',
           '</section>'
+        ].join("");
+      }
+
+      function renderHoPickerTools() {
+        var count = state.selectedHoNorms.length;
+        return [
+          '<div class="ho-picker-tools">',
+          '<div class="note">' + esc(count ? count + "개 호 선택됨" : "여러 호를 터치해서 합산할 수 있습니다.") + '</div>',
+          '<div class="ho-picker-actions">',
+          '<button class="chip" type="button" data-merge-selected-ho' + (count ? '' : ' disabled') + '>선택한 호 합산</button>',
+          '<button class="chip" type="button" data-clear-selected-ho' + (count ? '' : ' hidden') + '>선택 해제</button>',
+          '</div>',
+          '</div>'
         ].join("");
       }
 
@@ -1597,10 +1632,48 @@
       function bindHoChips() {
         resultsEl.querySelectorAll("[data-ho]").forEach(function (button) {
           button.addEventListener("click", function () {
-            hoInput.value = button.getAttribute("data-ho");
-            search();
+            toggleSelectedHo(button.getAttribute("data-ho"));
           });
         });
+        resultsEl.querySelectorAll("[data-merge-selected-ho]").forEach(function (button) {
+          button.addEventListener("click", searchSelectedHo);
+        });
+        resultsEl.querySelectorAll("[data-clear-selected-ho]").forEach(function (button) {
+          button.addEventListener("click", clearSelectedHo);
+        });
+      }
+
+      function toggleSelectedHo(ho) {
+        var norm = normalizeHo(ho);
+        if (!norm) return;
+        var next = state.selectedHoNorms.slice();
+        var index = next.indexOf(norm);
+        if (index === -1) next.push(norm);
+        else next.splice(index, 1);
+        state.selectedHoNorms = uniqueSortedHoNorms(next);
+        hoInput.value = formatHoSelection(state.selectedHoNorms);
+        rerenderStickyHoList();
+      }
+
+      function clearSelectedHo() {
+        state.selectedHoNorms = [];
+        hoInput.value = "";
+        rerenderStickyHoList();
+      }
+
+      function searchSelectedHo() {
+        if (!state.selectedHoNorms.length) return;
+        hoInput.value = formatHoSelection(state.selectedHoNorms);
+        search();
+      }
+
+      function rerenderStickyHoList() {
+        var section = resultsEl.querySelector("[data-ho-picker-section]");
+        if (!section) return;
+        var floorData = hasPrefetch(addressInput.value.trim()) ? buildFloorFromPrefetch(floorSelect.value) : null;
+        if (!floorData) return;
+        section.outerHTML = renderStickyHoList(floorData, hoInput.value);
+        bindHoChips();
       }
 
       function remember(data, type) {
@@ -2850,6 +2923,21 @@
           return uniqueSortedHoNorms(expanded.map(String));
         }
         return uniqueSortedHoNorms(raw.split(/[,\s]+/).map(normalizeHo));
+      }
+
+      function formatHoSelection(values) {
+        var norms = uniqueSortedHoNorms(values);
+        if (!norms.length) return "";
+        var compact = compactHoRange(norms);
+        return compact || norms.join(",");
+      }
+
+      function compactHoRange(norms) {
+        if (norms.length < 2) return norms[0] || "";
+        for (var i = 1; i < norms.length; i += 1) {
+          if (Number(norms[i]) !== Number(norms[i - 1]) + 1) return "";
+        }
+        return norms[0] + "-" + norms[norms.length - 1];
       }
 
       function uniqueSortedHoNorms(values) {
