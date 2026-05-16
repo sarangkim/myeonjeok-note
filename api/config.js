@@ -11,7 +11,16 @@ module.exports = async (req, res) => {
   return res.status(200).json({
     ok: true,
     kakaoMapJsKey: process.env.KAKAO_MAP_JS_KEY || "",
-    supabaseUrl: process.env.SUPABASE_URL || "",
+    supabaseUrl: cleanSupabaseUrl(process.env.SUPABASE_URL),
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "",
   });
 };
+
+function cleanSupabaseUrl(value) {
+  return String(value || "")
+    .replace(/\\r\\n|\\n|\\r/g, "")
+    .trim()
+    .replace(/\/rest\/v1\/?$/, "")
+    .replace(/\/+$/, "");
+}
+
