@@ -461,8 +461,16 @@
     }
 
     .chip.active {
-      background: var(--brand);
+      border-color: #c9352b;
+      background: #c9352b;
       color: #fff;
+      box-shadow: 0 0 0 3px rgba(201, 53, 43, 0.18);
+    }
+
+    .chip.in-range {
+      border-color: #d8752f;
+      background: #fff1e7;
+      color: #9b3c17;
     }
 
     .table-wrap {
@@ -822,7 +830,7 @@
         </label>
         <label>
           호
-          <input id="ho" name="ho" inputmode="numeric" placeholder="예: 1306">
+          <input id="ho" name="ho" inputmode="text" placeholder="예: 1306 또는 1216-1218">
         </label>
       </div>
       <div class="actions">
@@ -1229,6 +1237,10 @@
           await loadSummary();
           floor = floorSelect.value;
         }
+        if (isMultiHoInput(ho) && !hasPrefetch(address)) {
+          await loadSummary();
+          floor = floorSelect.value;
+        }
 
         setStatus("면적 데이터를 조회하는 중입니다.");
         try {
@@ -1236,7 +1248,7 @@
             ? (ho ? buildHoFromPrefetch(floor, ho) : buildFloorFromPrefetch(floor))
             : await requestArea({ address: address, floor: floor, ho: ho });
           if (data.mode === "floor") renderFloor(data);
-          else if (data.mode === "ho_breakdown") renderHoBreakdown(data);
+          else if (data.mode === "ho_breakdown" || data.mode === "multi_exposInfo_fallback") renderHoBreakdown(data);
           else renderFallback(data);
           remember(data, ho ? "호" : "층");
           setCurrentResult(data);
@@ -1324,6 +1336,64 @@
       function buildHoFromPrefetch(floor, ho) {
         var base = state.prefetch || {};
         var all = base.all_data || {};
+        var hoNorms = parseHoSelection(ho);
+        if (hoNorms.length > 1) {
+          var multiRows = [];
+          var seenRows = {};
+          hoNorms.forEach(function (hoNorm) {
+            findRowsByFloorAndHo(all.pub_items || [], floor, hoNorm).forEach(function (row) {
+              var key = [
+                row.flrNo || "",
+                row.hoNm || "",
+                row.exposPubuseGbCd || "",
+                row.mainPurpsCdNm || "",
+                row.etcPurps || "",
+                row.area || ""
+              ].join("|");
+              if (seenRows[key]) return;
+              seenRows[key] = true;
+              var copy = Object.assign({}, row);
+              copy._selectedHo = hoNorm;
+              multiRows.push(copy);
+            });
+          });
+          if (multiRows.length) return buildHoBreakdownLocal(base, floor, ho, hoNorms.join(","), multiRows);
+          var exposRows = [];
+          var seenExpos = {};
+          hoNorms.forEach(function (hoNorm) {
+            findRowsByFloorAndHo(all.expos_items || [], floor, hoNorm).forEach(function (row) {
+              var key = [row.flrNo || "", row.hoNm || "", row.mainPurpsCdNm || "", row.etcPurps || "", row.area || ""].join("|");
+              if (seenExpos[key]) return;
+              seenExpos[key] = true;
+              exposRows.push(row);
+            });
+          });
+          if (exposRows.length) {
+            var exposM2 = round2(exposRows.reduce(function (sum, row) { return sum + toNumber(row.area); }, 0));
+            return {
+              ok: true,
+              build: base.build,
+              mode: "multi_exposInfo_fallback",
+              input: { address: addressInput.value.trim(), floor: floor, ho: ho },
+              road: base.road || "",
+              jibun: base.jibun || "",
+              keys: base.keys || {},
+              sum: areaSummary(exposM2, null),
+              breakdown: exposRows.map(function (row) {
+                var areaM2 = toNumber(row.area);
+                return {
+                  gb: "전유",
+                  flrNm: row.flrNoNm || "",
+                  ho: row.hoNm || "-",
+                  use: row.mainPurpsCdNm || row.etcPurps || "",
+                  area_m2: areaM2,
+                  area_pyeong: round2(areaM2 / PYEONG_M2)
+                };
+              }),
+              note: "전유/공용 breakdown 데이터가 없어 여러 호의 전유부 면적을 합산했습니다."
+            };
+          }
+        }
         var wantHoNorm = normalizeHo(ho);
         var hoRows = findRowsByFloorAndHo(all.pub_items || [], floor, wantHoNorm);
         if (hoRows.length) return buildHoBreakdownLocal(base, floor, ho, wantHoNorm, hoRows);
@@ -1455,10 +1525,13 @@
 
       function renderHoChips(hoList, activeHo) {
         if (!hoList.length) return '<div class="note">조회된 호 목록이 없습니다. 호를 직접 입력해 조회할 수 있습니다.</div>';
-        var activeNorm = normalizeHo(activeHo || hoInput.value);
+        var activeNorms = parseHoSelection(activeHo || hoInput.value);
         return '<div class="chips">' + hoList.map(function (ho) {
-          var active = activeNorm && normalizeHo(ho) === activeNorm ? " active" : "";
-          return '<button class="chip' + active + '" type="button" data-ho="' + escAttr(ho) + '">' + esc(ho + "호") + '</button>';
+          var norm = normalizeHo(ho);
+          var isActive = activeNorms.length === 1 && norm === activeNorms[0];
+          var inRange = activeNorms.length > 1 && activeNorms.indexOf(norm) !== -1;
+          var className = isActive ? " active" : (inRange ? " in-range" : "");
+          return '<button class="chip' + className + '" type="button" data-ho="' + escAttr(ho) + '">' + esc(ho + "호") + '</button>';
         }).join("") + '</div>';
       }
 
@@ -1504,9 +1577,9 @@
       function renderBreakdown(rows) {
         if (!rows.length) return '<div class="note">breakdown 항목이 없습니다.</div>';
         return [
-          '<div class="table-wrap"><table><thead><tr><th>구분</th><th>층</th><th>용도</th><th class="num">m²</th><th class="num">평</th></tr></thead><tbody>',
+          '<div class="table-wrap"><table><thead><tr><th>구분</th><th>층</th><th>호</th><th>용도</th><th class="num">m²</th><th class="num">평</th></tr></thead><tbody>',
           rows.map(function (row) {
-            return '<tr><td>' + esc(row.gb || "-") + '</td><td>' + esc(row.flrNm || "-") + '</td><td>' + esc(row.use || "-") + '</td><td class="num">' + fmt(row.area_m2) + '</td><td class="num">' + fmt(row.area_pyeong) + '</td></tr>';
+            return '<tr><td>' + esc(row.gb || "-") + '</td><td>' + esc(row.flrNm || "-") + '</td><td>' + esc(row.ho || "-") + '</td><td>' + esc(row.use || "-") + '</td><td class="num">' + fmt(row.area_m2) + '</td><td class="num">' + fmt(row.area_pyeong) + '</td></tr>';
           }).join(""),
           '</tbody></table></div>'
         ].join("");
@@ -2707,6 +2780,7 @@
           return {
             gb: row.exposPubuseGbCdNm || codeToGb(row.exposPubuseGbCd),
             flrNm: row.flrNoNm || "",
+            ho: row.hoNm || (row._selectedHo ? row._selectedHo + "호" : ho),
             use: row.mainPurpsCdNm || row.etcPurps || "",
             area_m2: areaM2,
             area_pyeong: round2(areaM2 / PYEONG_M2),
@@ -2726,7 +2800,9 @@
           ho_matched: { want: ho, wantHoNorm: wantHoNorm },
           breakdown: breakdown,
           sum: areaSummary(exclusiveM2, sharedM2),
-          note: "주소 조회 시 미리 가져온 데이터 기준으로 호별 전유/공용을 구성했습니다."
+          note: parseHoSelection(ho).length > 1
+            ? "입력한 여러 호의 전유/공용 면적을 합산했습니다."
+            : "주소 조회 시 미리 가져온 데이터 기준으로 호별 전유/공용을 구성했습니다."
         };
       }
 
@@ -2760,6 +2836,29 @@
       function normalizeHo(value) {
         var match = String(value || "").match(/\d+/);
         return match ? match[0] : "";
+      }
+
+      function isMultiHoInput(value) {
+        return parseHoSelection(value).length > 1;
+      }
+
+      function parseHoSelection(value) {
+        var raw = String(value || "").trim();
+        if (!raw) return [];
+        var expanded = expandHoRange(raw);
+        if (expanded.length) {
+          return uniqueSortedHoNorms(expanded.map(String));
+        }
+        return uniqueSortedHoNorms(raw.split(/[,\s]+/).map(normalizeHo));
+      }
+
+      function uniqueSortedHoNorms(values) {
+        var seen = {};
+        return values.map(normalizeHo).filter(function (value) {
+          if (!value || seen[value]) return false;
+          seen[value] = true;
+          return true;
+        }).sort(function (a, b) { return Number(a) - Number(b); });
       }
 
       function normalizeFloor(value) {
