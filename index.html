@@ -567,6 +567,41 @@
       gap: 12px;
     }
 
+    .estimate-form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .estimate-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .estimate-result {
+      display: grid;
+      gap: 8px;
+      border: 1px solid #d8c8b5;
+      border-radius: 6px;
+      background: #fff8ed;
+      padding: 12px;
+    }
+
+    .estimate-price {
+      color: var(--brand-strong);
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .estimate-lines {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
     .note-list {
       display: grid;
       gap: 8px;
@@ -729,6 +764,10 @@
         grid-template-columns: 1fr 1fr;
       }
 
+      .estimate-grid {
+        grid-template-columns: 1fr;
+      }
+
       .button-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -801,6 +840,7 @@
       <aside class="note-panel">
         <div class="side-tabs">
           <button class="active" type="button" data-side-view="notes">내 메모</button>
+          <button type="button" data-side-view="estimate">견적</button>
           <button type="button" data-side-view="public">공개 요청</button>
           <button type="button" data-side-view="mine">내 요청</button>
           <button type="button" data-side-view="applied">내 신청</button>
@@ -838,6 +878,88 @@
           <h2>최근 조회</h2>
           <ul class="note-list" id="noteList"></ul>
           <div class="note" id="emptyNote">아직 저장된 조회가 없습니다.</div>
+        </div>
+
+        <div class="side-panel" id="estimatePanel" hidden>
+          <h2>청소 견적</h2>
+          <div class="estimate-form">
+            <label>
+              청소 종류
+              <select id="estimateType">
+                <option value="office_regular">사무실 정기청소</option>
+                <option value="office_movein">사무실 입주청소</option>
+                <option value="post_construction">준공청소</option>
+                <option value="deep_clean">대청소</option>
+                <option value="hospital_regular">병원 정기청소</option>
+                <option value="academy_regular">학원 정기청소</option>
+                <option value="apartment_movein">아파트 입주청소</option>
+                <option value="villa_stairs">빌라 계단청소</option>
+              </select>
+            </label>
+            <div class="estimate-grid">
+              <label>
+                면적(평)
+                <input id="estimateArea" inputmode="decimal" placeholder="조회 후 자동 입력">
+              </label>
+              <label>
+                월 방문 횟수
+                <input id="estimateVisits" inputmode="numeric" value="4">
+              </label>
+              <label>
+                화장실 수
+                <input id="estimateBathrooms" inputmode="numeric" value="1">
+              </label>
+              <label>
+                방/강의실/진료실 수
+                <input id="estimateRooms" inputmode="numeric" value="0">
+              </label>
+              <label>
+                계단 층수
+                <input id="estimateFloors" inputmode="numeric" value="4">
+              </label>
+              <label>
+                세대 수
+                <input id="estimateHouseholds" inputmode="numeric" value="8">
+              </label>
+              <label>
+                오염도
+                <select id="estimateDirt">
+                  <option value="normal">보통</option>
+                  <option value="low">낮음</option>
+                  <option value="high">높음</option>
+                  <option value="severe">매우 높음</option>
+                </select>
+              </label>
+              <label>
+                집기 상태
+                <select id="estimateFurniture">
+                  <option value="empty">비어 있음</option>
+                  <option value="some">일부 있음</option>
+                  <option value="many">많음</option>
+                </select>
+              </label>
+            </div>
+            <label class="check-row">
+              <input id="estimateWindow" type="checkbox">
+              창틀·베란다 중점
+            </label>
+            <label class="check-row">
+              <input id="estimateFloorCare" type="checkbox">
+              바닥 왁스·코팅 포함
+            </label>
+            <label class="check-row">
+              <input id="estimateWaste" type="checkbox">
+              폐기물·보양재 정리 포함
+            </label>
+            <label class="check-row">
+              <input id="estimateOffhour" type="checkbox">
+              야간·주말 작업
+            </label>
+            <button id="calculateEstimateBtn" type="button">견적 계산</button>
+            <div class="estimate-result" id="estimateResult">
+              <div class="note">주소와 호실을 조회하면 면적이 자동으로 들어갑니다.</div>
+            </div>
+          </div>
         </div>
 
         <div class="side-panel" id="requestsPanel" hidden>
@@ -896,6 +1018,22 @@
       var authStatus = document.getElementById("authStatus");
       var myNoteList = document.getElementById("myNoteList");
       var loginForm = document.getElementById("loginForm");
+      var estimatePanel = document.getElementById("estimatePanel");
+      var estimateTypeInput = document.getElementById("estimateType");
+      var estimateAreaInput = document.getElementById("estimateArea");
+      var estimateVisitsInput = document.getElementById("estimateVisits");
+      var estimateBathroomsInput = document.getElementById("estimateBathrooms");
+      var estimateRoomsInput = document.getElementById("estimateRooms");
+      var estimateFloorsInput = document.getElementById("estimateFloors");
+      var estimateHouseholdsInput = document.getElementById("estimateHouseholds");
+      var estimateDirtInput = document.getElementById("estimateDirt");
+      var estimateFurnitureInput = document.getElementById("estimateFurniture");
+      var estimateWindowInput = document.getElementById("estimateWindow");
+      var estimateFloorCareInput = document.getElementById("estimateFloorCare");
+      var estimateWasteInput = document.getElementById("estimateWaste");
+      var estimateOffhourInput = document.getElementById("estimateOffhour");
+      var calculateEstimateBtn = document.getElementById("calculateEstimateBtn");
+      var estimateResult = document.getElementById("estimateResult");
       var accountButton = document.getElementById("accountButton");
       var accountMenu = document.getElementById("accountMenu");
       var accountEmail = document.getElementById("accountEmail");
@@ -978,6 +1116,8 @@
         notePasswordInput.hidden = !protectNoteInput.checked;
         if (!protectNoteInput.checked) notePasswordInput.value = "";
       });
+      calculateEstimateBtn.addEventListener("click", renderEstimate);
+      estimateTypeInput.addEventListener("change", renderEstimate);
       loginBtn.addEventListener("click", requestLoginLink);
       googleLoginBtn.addEventListener("click", loginWithGoogle);
       logoutBtn.addEventListener("click", logout);
@@ -1503,6 +1643,7 @@
         state.currentNote = null;
         shareBox.hidden = true;
         shareBox.textContent = "";
+        syncEstimateArea(data);
       }
 
       function showShareLink(id) {
@@ -1755,11 +1896,16 @@
         });
 
         var isNotes = view === "notes";
+        var isEstimate = view === "estimate";
         notesPanel.hidden = !isNotes;
-        requestsPanel.hidden = isNotes;
+        estimatePanel.hidden = !isEstimate;
+        requestsPanel.hidden = isNotes || isEstimate;
         fieldCreateBlock.hidden = view !== "mine";
 
-        if (view === "public") {
+        if (isEstimate) {
+          syncEstimateArea(state.currentResult);
+          renderEstimate();
+        } else if (view === "public") {
           requestsPanelTitle.textContent = "공개 요청";
           loadFieldRequests();
         } else if (view === "mine") {
@@ -1769,6 +1915,130 @@
           requestsPanelTitle.textContent = "내 신청";
           loadAppliedFieldRequests();
         }
+      }
+
+      function syncEstimateArea(data) {
+        var area = estimateAreaFromResult(data);
+        if (area) estimateAreaInput.value = area;
+      }
+
+      function estimateAreaFromResult(data) {
+        var sum = data && data.sum ? data.sum : {};
+        return Number(sum.total_pyeong || sum.exclusive_pyeong || 0);
+      }
+
+      function renderEstimate() {
+        var estimate = calculateEstimate();
+        if (!estimate.ok) {
+          estimateResult.innerHTML = '<div class="note">' + esc(estimate.message) + '</div>';
+          return;
+        }
+
+        estimateResult.innerHTML = [
+          '<div class="note">' + esc(estimate.label) + '</div>',
+          '<div class="estimate-price">' + esc(formatWonRange(estimate.low, estimate.high)) + '</div>',
+          '<div class="estimate-lines">',
+          estimate.lines.map(function (line) { return '<span>' + esc(line) + '</span>'; }).join(""),
+          '<span>현장 상태, 작업 범위, 지역, 주차·엘리베이터 조건에 따라 최종 금액은 달라질 수 있습니다.</span>',
+          '</div>'
+        ].join("");
+      }
+
+      function calculateEstimate() {
+        var type = estimateTypeInput.value;
+        var area = toNumber(estimateAreaInput.value || estimateAreaFromResult(state.currentResult));
+        var visits = Math.max(1, Math.round(toNumber(estimateVisitsInput.value) || 4));
+        var bathrooms = Math.max(0, Math.round(toNumber(estimateBathroomsInput.value) || 0));
+        var rooms = Math.max(0, Math.round(toNumber(estimateRoomsInput.value) || 0));
+        var floors = Math.max(1, Math.round(toNumber(estimateFloorsInput.value) || 1));
+        var households = Math.max(0, Math.round(toNumber(estimateHouseholdsInput.value) || 0));
+        var dirt = ({ low: 0.92, normal: 1, high: 1.18, severe: 1.38 })[estimateDirtInput.value] || 1;
+        var furniture = ({ empty: 1, some: 1.08, many: 1.2 })[estimateFurnitureInput.value] || 1;
+        var optionTotal = 0;
+        var lines = [];
+        var label = estimateTypeInput.options[estimateTypeInput.selectedIndex].text;
+        var price = 0;
+
+        if (!area && type !== "villa_stairs") {
+          return { ok: false, message: "면적을 조회하거나 평수를 직접 입력해주세요." };
+        }
+
+        if (type === "office_regular") {
+          price = regularOfficeMonthly(area, visits);
+          optionTotal += bathrooms * 8000 + rooms * 4000;
+          lines.push("30평 이하 주 1회 월 20만원대, 31~50평 주 1회 월 30만원대 공개 단가를 기준으로 계산했습니다.");
+          lines.push("월 방문 " + visits + "회, 화장실 " + bathrooms + "개, 방/회의실 " + rooms + "개 반영");
+        } else if (type === "hospital_regular") {
+          price = regularOfficeMonthly(area, visits) * 1.35;
+          optionTotal += bathrooms * 12000 + rooms * 8000;
+          lines.push("병원은 일반 사무실 정기청소에 위생·소독 관리 부담을 35% 가산했습니다.");
+          lines.push("월 방문 " + visits + "회, 진료실 " + rooms + "개, 화장실 " + bathrooms + "개 반영");
+        } else if (type === "academy_regular") {
+          price = regularOfficeMonthly(area, visits) * 1.18;
+          optionTotal += bathrooms * 9000 + rooms * 6000;
+          lines.push("학원은 일반 사무실 정기청소에 책상·강의실 반복 사용 부담을 18% 가산했습니다.");
+          lines.push("월 방문 " + visits + "회, 강의실 " + rooms + "개, 화장실 " + bathrooms + "개 반영");
+        } else if (type === "office_movein") {
+          price = Math.max(250000, area * 18000);
+          optionTotal += bathrooms * 18000 + rooms * 7000;
+          lines.push("사업장 청소 공개 단가 평당 15,000~30,000원 범위의 중간값에 가깝게 잡았습니다.");
+        } else if (type === "post_construction") {
+          price = Math.max(350000, area * 20000);
+          optionTotal += rooms * 8000;
+          if (!estimateWasteInput.checked) optionTotal += area * 1500;
+          lines.push("준공·건축 청소 공개 단가 평당 15,000~25,000원 범위를 기준으로 잡았습니다.");
+        } else if (type === "deep_clean") {
+          price = Math.max(220000, area * 13000);
+          optionTotal += bathrooms * 20000 + rooms * 8000;
+          lines.push("대청소는 입주청소보다 낮고 일반 유지청소보다 높은 1회성 단가로 계산했습니다.");
+        } else if (type === "apartment_movein") {
+          price = Math.max(150000, area * 14000);
+          optionTotal += bathrooms * 22000;
+          lines.push("아파트 입주청소 공개 단가 평당 10,000~15,500원과 20~30평대 가격표를 기준으로 계산했습니다.");
+        } else if (type === "villa_stairs") {
+          price = Math.max(35000, floors * 12000 + households * 1200) * Math.max(1, visits / 4);
+          optionTotal += estimateWasteInput.checked ? 25000 : 0;
+          lines.push("빌라 계단청소 공개 사례인 4~5층 월 1회 35,000원, 5층 월 4회 6~7만원을 기준으로 계산했습니다.");
+          lines.push("계단 " + floors + "층, " + households + "세대, 월 방문 " + visits + "회 반영");
+        }
+
+        if (estimateWindowInput.checked) optionTotal += Math.max(30000, area * 1200);
+        if (estimateFloorCareInput.checked) optionTotal += Math.max(50000, area * 3500);
+        if (estimateWasteInput.checked && type !== "villa_stairs") optionTotal += Math.max(30000, area * 2000);
+
+        price = (price + optionTotal) * dirt * furniture;
+        if (estimateOffhourInput.checked) price *= 1.15;
+
+        var low = roundToThousand(price * 0.9);
+        var high = roundToThousand(price * 1.15);
+        lines.unshift(type === "villa_stairs" ? "예상 월 견적입니다." : "예상 1회 견적입니다.");
+        if (type.indexOf("regular") !== -1) lines[0] = "예상 월 견적입니다.";
+        lines.push("오염도 " + estimateDirtInput.options[estimateDirtInput.selectedIndex].text + ", 집기 " + estimateFurnitureInput.options[estimateFurnitureInput.selectedIndex].text + " 반영");
+        return { ok: true, label: label, low: low, high: high, lines: lines };
+      }
+
+      function regularOfficeMonthly(area, visits) {
+        var once;
+        if (area <= 30) once = 200000;
+        else if (area <= 50) once = 300000;
+        else once = 300000 + (area - 50) * 5000;
+        var weeklyVisits = Math.max(0.25, visits / 4);
+        var visitFactor = weeklyVisits <= 1 ? weeklyVisits : 1 + (weeklyVisits - 1) * 0.65;
+        return once * visitFactor;
+      }
+
+      function formatWonRange(low, high) {
+        return fmtWon(low) + " ~ " + fmtWon(high);
+      }
+
+      function fmtWon(value) {
+        var n = Math.round(Number(value || 0));
+        if (n >= 10000) return Math.round(n / 10000).toLocaleString("ko-KR") + "만원";
+        return n.toLocaleString("ko-KR") + "원";
+      }
+
+      function roundToThousand(value) {
+        return Math.round(Number(value || 0) / 1000) * 1000;
       }
 
       async function loadProfile() {
