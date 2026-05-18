@@ -867,6 +867,7 @@
           <button type="button" data-side-view="public">공개 요청</button>
           <button type="button" data-side-view="mine">내 요청</button>
           <button type="button" data-side-view="applied">내 신청</button>
+          <button type="button" data-side-view="board">게시판</button>
         </div>
 
         <div class="side-panel" id="notesPanel">
@@ -985,6 +986,17 @@
           </div>
         </div>
 
+        <div class="side-panel" id="boardPanel" hidden>
+          <h2>자유게시판</h2>
+          <div class="field-form" id="boardCreateBlock">
+            <input id="boardTitle" placeholder="제목">
+            <textarea id="boardBody" placeholder="내용을 입력하세요. 로그인한 사람만 볼 수 있습니다."></textarea>
+            <button id="createBoardPostBtn" type="button">글 등록</button>
+          </div>
+          <div class="note" id="boardStatus"></div>
+          <ul class="note-list" id="boardList"></ul>
+        </div>
+
         <div class="side-panel" id="requestsPanel" hidden>
           <h2 id="requestsPanelTitle">공개 요청</h2>
           <div class="field-form">
@@ -1090,6 +1102,12 @@
       var requestsPanel = document.getElementById("requestsPanel");
       var requestsPanelTitle = document.getElementById("requestsPanelTitle");
       var fieldCreateBlock = document.getElementById("fieldCreateBlock");
+      var boardPanel = document.getElementById("boardPanel");
+      var boardTitleInput = document.getElementById("boardTitle");
+      var boardBodyInput = document.getElementById("boardBody");
+      var createBoardPostBtn = document.getElementById("createBoardPostBtn");
+      var boardStatus = document.getElementById("boardStatus");
+      var boardList = document.getElementById("boardList");
 
       var state = {
         floors: [],
@@ -1106,7 +1124,8 @@
         authSession: null,
         profile: null,
         profileStats: null,
-        selectedHoNorms: []
+        selectedHoNorms: [],
+        boardCurrentPost: null
       };
 
       form.addEventListener("submit", function (event) {
@@ -1160,6 +1179,7 @@
       loadFieldRequestsBtn.addEventListener("click", loadFieldRequests);
       loadMyFieldRequestsBtn.addEventListener("click", loadMyFieldRequests);
       loadAppliedFieldRequestsBtn.addEventListener("click", loadAppliedFieldRequests);
+      createBoardPostBtn.addEventListener("click", createBoardPost);
       sideTabButtons.forEach(function (button) {
         button.addEventListener("click", function () {
           selectSideView(button.getAttribute("data-side-view"));
@@ -2043,9 +2063,11 @@
 
         var isNotes = view === "notes";
         var isEstimate = view === "estimate";
+        var isBoard = view === "board";
         notesPanel.hidden = !isNotes;
         estimatePanel.hidden = !isEstimate;
-        requestsPanel.hidden = isNotes || isEstimate;
+        boardPanel.hidden = !isBoard;
+        requestsPanel.hidden = isNotes || isEstimate || isBoard;
         fieldCreateBlock.hidden = view !== "mine";
 
         if (isEstimate) {
@@ -2060,6 +2082,8 @@
         } else if (view === "applied") {
           requestsPanelTitle.textContent = "내 신청";
           loadAppliedFieldRequests();
+        } else if (isBoard) {
+          loadBoardPosts();
         }
       }
 
@@ -2733,6 +2757,152 @@
         }
       }
 
+
+      async function createBoardPost() {
+        if (!state.authSession) {
+          boardStatus.textContent = "게시판 글쓰기는 로그인이 필요합니다.";
+          return;
+        }
+        var payload = { title: boardTitleInput.value.trim(), body: boardBodyInput.value.trim() };
+        if (!payload.title || !payload.body) {
+          boardStatus.textContent = "제목과 내용을 입력해주세요.";
+          return;
+        }
+        boardStatus.textContent = "글을 등록하는 중입니다.";
+        try {
+          var response = await fetch("/api/board", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(payload) });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "글 등록에 실패했습니다.");
+          boardTitleInput.value = "";
+          boardBodyInput.value = "";
+          boardStatus.textContent = "글을 등록했습니다.";
+          loadBoardPosts();
+        } catch (error) {
+          boardStatus.textContent = error.message;
+        }
+      }
+
+      async function loadBoardPosts() {
+        if (!state.authSession) {
+          boardStatus.textContent = "게시판은 로그인이 필요합니다.";
+          boardList.innerHTML = '<li class="note-card"><span>로그인 후 게시판을 볼 수 있습니다.</span></li>';
+          return;
+        }
+        boardStatus.textContent = "게시글을 불러오는 중입니다.";
+        try {
+          var response = await fetch("/api/board", { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "게시글을 불러오지 못했습니다.");
+          renderBoardPosts(data.posts || []);
+          boardStatus.textContent = "게시글을 불러왔습니다.";
+        } catch (error) {
+          boardStatus.textContent = error.message;
+        }
+      }
+
+      function renderBoardPosts(posts) {
+        state.boardCurrentPost = null;
+        if (!posts.length) {
+          boardList.innerHTML = '<li class="note-card"><span>아직 게시글이 없습니다.</span></li>';
+          return;
+        }
+        boardList.innerHTML = posts.map(function (post) {
+          var meta = [post.author_name || "익명 사용자", formatDateTime(post.updated_at || post.created_at), "댓글 " + Number(post.comment_count || 0)].filter(Boolean).join(" · ");
+          return '<li class="note-card"><button class="chip" type="button" data-open-board-post="' + escAttr(post.id) + '">열기</button><strong>' + esc(post.title || "제목 없음") + '</strong><span>' + esc(meta) + '</span><span>' + esc(shortText(post.body, 90)) + '</span></li>';
+        }).join("");
+        boardList.querySelectorAll("[data-open-board-post]").forEach(function (button) {
+          button.addEventListener("click", function () { loadBoardPostDetail(button.getAttribute("data-open-board-post")); });
+        });
+      }
+
+      async function loadBoardPostDetail(postId) {
+        if (!state.authSession) {
+          boardStatus.textContent = "게시글 보기는 로그인이 필요합니다.";
+          return;
+        }
+        boardStatus.textContent = "게시글을 불러오는 중입니다.";
+        try {
+          var response = await fetch("/api/board?detail=1&post_id=" + encodeURIComponent(postId), { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "게시글을 불러오지 못했습니다.");
+          state.boardCurrentPost = data.post;
+          renderBoardPostDetail(data.post, data.comments || [], data.viewer_user_id || "");
+          boardStatus.textContent = "게시글을 불러왔습니다.";
+        } catch (error) {
+          boardStatus.textContent = error.message;
+        }
+      }
+
+      function renderBoardPostDetail(post, comments, viewerUserId) {
+        var mine = post.author_user_id && post.author_user_id === viewerUserId;
+        var commentHtml = comments.length ? comments.map(function (comment) {
+          var meta = [comment.author_name || "익명 사용자", formatDateTime(comment.created_at)].filter(Boolean).join(" · ");
+          return '<li class="note-card"><strong>' + esc(meta) + '</strong><span>' + esc(comment.body || "") + '</span></li>';
+        }).join("") : '<li class="note-card"><span>아직 댓글이 없습니다.</span></li>';
+        boardList.innerHTML = '<li class="note-card"><button class="chip" type="button" data-board-back="1">목록</button>' + (mine ? '<button class="chip" type="button" data-board-edit="' + escAttr(post.id) + '">수정</button><button class="chip" type="button" data-board-delete="' + escAttr(post.id) + '">삭제</button>' : '') + '<strong>' + esc(post.title || "제목 없음") + '</strong><span>' + esc([post.author_name || "익명 사용자", formatDateTime(post.created_at)].filter(Boolean).join(" · ")) + '</span><span>' + esc(post.body || "") + '</span></li><li class="note-card"><strong>댓글</strong><textarea id="boardCommentBody" placeholder="댓글을 입력하세요."></textarea><button class="chip" type="button" data-board-comment="' + escAttr(post.id) + '">댓글 등록</button></li>' + commentHtml;
+        boardList.querySelectorAll("[data-board-back]").forEach(function (button) { button.addEventListener("click", loadBoardPosts); });
+        boardList.querySelectorAll("[data-board-comment]").forEach(function (button) { button.addEventListener("click", function () { createBoardComment(button.getAttribute("data-board-comment")); }); });
+        boardList.querySelectorAll("[data-board-edit]").forEach(function (button) { button.addEventListener("click", function () { editBoardPost(button.getAttribute("data-board-edit")); }); });
+        boardList.querySelectorAll("[data-board-delete]").forEach(function (button) { button.addEventListener("click", function () { deleteBoardPost(button.getAttribute("data-board-delete")); }); });
+      }
+
+      async function createBoardComment(postId) {
+        var textarea = document.getElementById("boardCommentBody");
+        var body = textarea ? textarea.value.trim() : "";
+        if (!body) {
+          boardStatus.textContent = "댓글 내용을 입력해주세요.";
+          return;
+        }
+        boardStatus.textContent = "댓글을 등록하는 중입니다.";
+        try {
+          var response = await fetch("/api/board", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ action: "comment", post_id: postId, body: body }) });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "댓글 등록에 실패했습니다.");
+          boardStatus.textContent = "댓글을 등록했습니다.";
+          loadBoardPostDetail(postId);
+        } catch (error) {
+          boardStatus.textContent = error.message;
+        }
+      }
+
+      async function editBoardPost(postId) {
+        var post = state.boardCurrentPost;
+        if (!post || post.id !== postId) return;
+        var title = window.prompt("제목을 수정하세요.", post.title || "");
+        if (title === null) return;
+        var body = window.prompt("내용을 수정하세요.", post.body || "");
+        if (body === null) return;
+        boardStatus.textContent = "게시글을 수정하는 중입니다.";
+        try {
+          var response = await fetch("/api/board", { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ post_id: postId, title: title, body: body }) });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "게시글 수정에 실패했습니다.");
+          boardStatus.textContent = "게시글을 수정했습니다.";
+          loadBoardPostDetail(postId);
+        } catch (error) {
+          boardStatus.textContent = error.message;
+        }
+      }
+
+      async function deleteBoardPost(postId) {
+        if (!window.confirm("이 게시글을 삭제할까요?")) return;
+        boardStatus.textContent = "게시글을 삭제하는 중입니다.";
+        try {
+          var response = await fetch("/api/board", { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ action: "delete", post_id: postId }) });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "게시글 삭제에 실패했습니다.");
+          boardStatus.textContent = "게시글을 삭제했습니다.";
+          loadBoardPosts();
+        } catch (error) {
+          boardStatus.textContent = error.message;
+        }
+      }
+
+      function shortText(text, max) {
+        var s = String(text || "").replace(/\\s+/g, " ").trim();
+        return s.length > max ? s.slice(0, max - 1) + "…" : s;
+      }
+
       async function getConfig() {
         if (state.config) return state.config;
         var response = await fetch("/api/config");
@@ -3169,3 +3339,4 @@
   </script>
 </body>
 </html>
+
