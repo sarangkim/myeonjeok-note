@@ -1588,6 +1588,38 @@
         mountFieldCreateBlock(data);
       }
 
+      function renderFieldRequestMount() {
+
+
+        return '<section class="section" id="fieldCreateMount"><h2 class="section-title">?? ?? ??</h2></section>';
+
+
+      }
+
+
+
+      function mountFieldCreateBlock(data) {
+
+
+        var mount = document.getElementById("fieldCreateMount");
+
+
+        if (!mount) return;
+
+
+        mount.appendChild(fieldCreateBlock);
+
+
+        fieldCreateBlock.hidden = false;
+
+
+        prefillFieldRequest(data || state.currentResult || {});
+
+
+      }
+
+
+
       function renderAddress(data) {
         return [
           '<section class="section"><h2 class="section-title">주소</h2><div class="meta-grid">',
