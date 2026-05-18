@@ -18,6 +18,7 @@ module.exports = async (req, res) => {
     assertSupabaseEnv();
     const user = await getAuthUser(req);
     if (!user) return res.status(401).json({ ok: false, message: "게시판은 로그인이 필요합니다." });
+    const viewerIsAdmin = isBoardAdmin(user);
 
     if (req.method === "GET") {
       if (String(req.query.detail || "") === "1") {
@@ -30,12 +31,12 @@ module.exports = async (req, res) => {
         const comments = await supabaseRequest(`${COMMENTS_TABLE}?post_id=eq.${encodeURIComponent(postId)}&status=eq.active&select=${COMMENT_COLUMNS}&order=created_at.asc&limit=200`, { method: "GET" });
         const enrichedPosts = await attachAuthors(posts);
         const enrichedComments = await attachAuthors(comments);
-        return res.status(200).json({ ok: true, viewer_user_id: user.id, post: enrichedPosts[0], comments: enrichedComments });
+        return res.status(200).json({ ok: true, viewer_user_id: user.id, viewer_is_admin: viewerIsAdmin, post: enrichedPosts[0], comments: enrichedComments });
       }
 
       const posts = await supabaseRequest(`${POSTS_TABLE}?status=eq.active&select=${POST_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" });
       const withAuthors = await attachAuthors(await attachCommentCounts(posts));
-      return res.status(200).json({ ok: true, viewer_user_id: user.id, posts: withAuthors });
+      return res.status(200).json({ ok: true, viewer_user_id: user.id, viewer_is_admin: viewerIsAdmin, posts: withAuthors });
     }
 
     if (req.method === "POST") {
@@ -82,30 +83,55 @@ module.exports = async (req, res) => {
 
     if (req.method === "PATCH") {
       const body = await readJson(req);
-      const postId = cleanId(body.post_id);
-      if (!postId) return res.status(400).json({ ok: false, message: "글 ID가 필요합니다." });
 
-      const owned = await supabaseRequest(`${POSTS_TABLE}?id=eq.${encodeURIComponent(postId)}&author_user_id=eq.${encodeURIComponent(user.id)}&status=eq.active&select=${POST_COLUMNS}&limit=1`, { method: "GET" });
-      if (!owned.length) return res.status(403).json({ ok: false, message: "작성자만 수정할 수 있습니다." });
+      if (body.action === "delete_comment") {
+        const commentId = cleanId(body.comment_id);
+        if (!commentId) return res.status(400).json({ ok: false, message: "\uB313\uAE00 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." });
+
+        const comments = await supabaseRequest(COMMENTS_TABLE + "?id=eq." + encodeURIComponent(commentId) + "&status=eq.active&select=" + COMMENT_COLUMNS + "&limit=1", { method: "GET" });
+        if (!comments.length) return res.status(404).json({ ok: false, message: "\uB313\uAE00\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4." });
+
+        const comment = comments[0];
+        const canDeleteComment = viewerIsAdmin || comment.author_user_id === user.id;
+        if (!canDeleteComment) return res.status(403).json({ ok: false, message: "\uAD00\uB9AC\uC790\uB098 \uC791\uC131\uC790\uB9CC \uB313\uAE00\uC744 \uC0AD\uC81C\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4." });
+
+        const updated = await supabaseRequest(COMMENTS_TABLE + "?id=eq." + encodeURIComponent(commentId) + "&select=" + COMMENT_COLUMNS, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "deleted", updated_at: new Date().toISOString() }),
+        });
+        return res.status(200).json({ ok: true, comment: updated[0] });
+      }
+
+      const postId = cleanId(body.post_id);
+      if (!postId) return res.status(400).json({ ok: false, message: "\uAE00 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." });
+
+      const posts = await supabaseRequest(POSTS_TABLE + "?id=eq." + encodeURIComponent(postId) + "&status=eq.active&select=" + POST_COLUMNS + "&limit=1", { method: "GET" });
+      if (!posts.length) return res.status(404).json({ ok: false, message: "\uAE00\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4." });
+
+      const post = posts[0];
+      const isOwner = post.author_user_id === user.id;
 
       if (body.action === "delete") {
-        const updated = await supabaseRequest(`${POSTS_TABLE}?id=eq.${encodeURIComponent(postId)}&select=${POST_COLUMNS}`, {
+        if (!isOwner && !viewerIsAdmin) return res.status(403).json({ ok: false, message: "\uAD00\uB9AC\uC790\uB098 \uC791\uC131\uC790\uB9CC \uAE00\uC744 \uC0AD\uC81C\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4." });
+        const updated = await supabaseRequest(POSTS_TABLE + "?id=eq." + encodeURIComponent(postId) + "&select=" + POST_COLUMNS, {
           method: "PATCH",
           body: JSON.stringify({ status: "deleted", updated_at: new Date().toISOString() }),
         });
         return res.status(200).json({ ok: true, post: updated[0] });
       }
 
+      if (!isOwner) return res.status(403).json({ ok: false, message: "\uC791\uC131\uC790\uB9CC \uC218\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4." });
+
       const row = {
         title: clamp(body.title, 120),
         body: clamp(body.body, 5000),
         updated_at: new Date().toISOString(),
       };
-      if (!row.title || !row.body) return res.status(400).json({ ok: false, message: "제목과 내용을 입력해주세요." });
+      if (!row.title || !row.body) return res.status(400).json({ ok: false, message: "\uC81C\uBAA9\uACFC \uB0B4\uC6A9\uC744 \uC785\uB825\uD574\uC8FC\uC138\uC694." });
 
-      const updated = await supabaseRequest(`${POSTS_TABLE}?id=eq.${encodeURIComponent(postId)}&select=${POST_COLUMNS}`, { method: "PATCH", body: JSON.stringify(row) });
-      const posts = await attachAuthors(updated);
-      return res.status(200).json({ ok: true, post: posts[0] });
+      const updated = await supabaseRequest(POSTS_TABLE + "?id=eq." + encodeURIComponent(postId) + "&select=" + POST_COLUMNS, { method: "PATCH", body: JSON.stringify(row) });
+      const enriched = await attachAuthors(updated);
+      return res.status(200).json({ ok: true, post: enriched[0] });
     }
 
     return res.status(405).json({ ok: false, message: "허용되지 않는 요청 방식입니다." });
@@ -144,6 +170,22 @@ async function supabaseRequest(path, options) {
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.message || data?.hint || `Supabase 오류: ${response.status}`);
   return Array.isArray(data) ? data : [];
+}
+
+function envList(name) {
+  return String(process.env[name] || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isBoardAdmin(user) {
+  if (!user) return false;
+  const emails = envList("BOARD_ADMIN_EMAILS");
+  const ids = envList("BOARD_ADMIN_USER_IDS");
+  const email = String(user.email || "").trim().toLowerCase();
+  const id = String(user.id || "").trim().toLowerCase();
+  return (!!email && emails.includes(email)) || (!!id && ids.includes(id));
 }
 
 async function getAuthUser(req) {
