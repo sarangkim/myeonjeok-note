@@ -7,7 +7,7 @@ const PROFILE_COLUMNS = `${BASE_PROFILE_COLUMNS},member_role,provider_status,pro
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -22,7 +22,37 @@ module.exports = async (req, res) => {
       profile.avatar_url = getAvatarUrl(user);
       const stats = await getApplicantStats(user.id);
       Object.assign(stats, await getNotificationStats(user.id));
-      return res.status(200).json({ ok: true, profile, stats });
+      return res.status(200).json({ ok: true, is_admin: isAdminUser(user), profile, stats });
+    }
+
+    if (req.method === "PATCH") {
+      if (!isAdminUser(user)) return res.status(403).json({ ok: false, message: "\uAD00\uB9AC\uC790\uB9CC \uCC98\uB9AC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4." });
+      const body = await readJson(req);
+
+      if (body.action === "list_providers") {
+        const status = normalizeProviderStatus(body.status || "pending");
+        const rows = await listProviderProfiles(status);
+        return res.status(200).json({ ok: true, providers: rows });
+      }
+
+      if (body.action === "set_provider_status") {
+        const userId = cleanUuid(body.user_id);
+        const status = normalizeProviderStatus(body.provider_status);
+        if (!userId) return res.status(400).json({ ok: false, message: "\uD68C\uC6D0 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." });
+        if (!["approved", "rejected", "pending"].includes(status)) return res.status(400).json({ ok: false, message: "\uC2B9\uC778 \uC0C1\uD0DC\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4." });
+        const row = {
+          provider_status: status,
+          provider_approved_at: status === "approved" ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        };
+        const updated = await supabaseRequest(PROFILES_TABLE + "?user_id=eq." + encodeURIComponent(userId) + "&select=" + PROFILE_COLUMNS, {
+          method: "PATCH",
+          body: JSON.stringify(row),
+        });
+        return res.status(200).json({ ok: true, profile: normalizeProfileDefaults(updated[0] || {}) });
+      }
+
+      return res.status(400).json({ ok: false, message: "\uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uC791\uC5C5\uC785\uB2C8\uB2E4." });
     }
 
     if (req.method === "POST") {
@@ -50,7 +80,7 @@ module.exports = async (req, res) => {
       Object.assign(stats, await getNotificationStats(user.id));
       const profile = normalizeProfileDefaults(updated[0] || row);
       profile.avatar_url = getAvatarUrl(user);
-      return res.status(200).json({ ok: true, profile, stats });
+      return res.status(200).json({ ok: true, is_admin: isAdminUser(user), profile, stats });
     }
 
     return res.status(405).json({ ok: false, message: "허용되지 않는 요청 방식입니다." });
@@ -91,6 +121,39 @@ async function getProfile(user) {
   };
 }
 
+function envList(name) {
+  return String(process.env[name] || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isAdminUser(user) {
+  if (!user) return false;
+  const emails = [...envList("ADMIN_EMAILS"), ...envList("BOARD_ADMIN_EMAILS")];
+  const email = String(user.email || "").trim().toLowerCase();
+  return !!email && emails.includes(email);
+}
+
+function normalizeProviderStatus(value) {
+  const status = String(value || "pending").trim();
+  return ["none", "pending", "approved", "rejected"].includes(status) ? status : "pending";
+}
+
+function cleanUuid(value) {
+  const id = String(value || "").trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) ? id : "";
+}
+
+async function listProviderProfiles(status) {
+  const filter = status === "none" ? "" : "&provider_status=eq." + encodeURIComponent(status);
+  try {
+    return await supabaseRequest(PROFILES_TABLE + "?member_role=eq.provider" + filter + "&select=" + PROFILE_COLUMNS + "&order=provider_requested_at.desc.nullslast,updated_at.desc&limit=100", { method: "GET" });
+  } catch (error) {
+    if (!isMissingProfileRoleColumns(error)) throw error;
+    return [];
+  }
+}
 function normalizeMemberRole(value) {
   return String(value || "customer") === "provider" ? "provider" : "customer";
 }
