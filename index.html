@@ -888,6 +888,11 @@
           <button class="secondary" id="topLoginBtn" type="button">로그인 링크 받기</button>
           <div class="profile-form" id="profileForm" hidden>
             <input id="profileDisplayName" placeholder="이름 또는 담당자명">
+            <select id="profileMemberRole">
+              <option value="customer">일반 회원</option>
+              <option value="provider">청소업체/사장님</option>
+            </select>
+
             <input id="profileCompanyName" placeholder="업체명">
             <input id="profilePhone" placeholder="연락처">
             <input id="profileServiceArea" placeholder="활동지역 예: 서울 강서구, 마포구">
@@ -1144,6 +1149,8 @@
       var topLogoutBtn = document.getElementById("topLogoutBtn");
       var profileForm = document.getElementById("profileForm");
       var profileDisplayNameInput = document.getElementById("profileDisplayName");
+      var profileMemberRoleInput = document.getElementById("profileMemberRole");
+
       var profileCompanyNameInput = document.getElementById("profileCompanyName");
       var profilePhoneInput = document.getElementById("profilePhone");
       var profileServiceAreaInput = document.getElementById("profileServiceArea");
@@ -2377,6 +2384,7 @@
             headers: authHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
               display_name: profileDisplayNameInput.value,
+              member_role: profileMemberRoleInput.value,
               company_name: profileCompanyNameInput.value,
               phone: profilePhoneInput.value,
               service_area: profileServiceAreaInput.value,
@@ -2399,6 +2407,8 @@
       function fillProfileForm() {
         var profile = state.profile || {};
         profileDisplayNameInput.value = profile.display_name || "";
+        profileMemberRoleInput.value = profile.member_role || "customer";
+
         profileCompanyNameInput.value = profile.company_name || "";
         profilePhoneInput.value = profile.phone || "";
         profileServiceAreaInput.value = profile.service_area || "";
@@ -2438,6 +2448,17 @@
           profileForm.hidden = false;
           renderAccountProfile();
         });
+      }
+
+
+      function memberRoleText(profile) {
+        if (!profile) return "";
+        if (profile.member_role === "provider") {
+          if (profile.provider_status === "approved") return "\uC2B9\uC778 \uC5C5\uCCB4";
+          if (profile.provider_status === "rejected") return "\uC5C5\uCCB4 \uC2B9\uC778 \uAC70\uC808";
+          return "\uC5C5\uCCB4 \uC2B9\uC778 \uB300\uAE30";
+        }
+        return "\uC77C\uBC18 \uD68C\uC6D0";
       }
 
       function renderAccountButton(initial, avatarUrl, notificationCount) {
@@ -2606,17 +2627,17 @@
       async function loadFieldRequests() {
         fieldStatus.textContent = "공개 요청을 불러오는 중입니다.";
         try {
-          var response = await fetch("/api/field-requests");
+          var response = await fetch("/api/field-requests", { headers: state.authSession ? authHeaders() : {} });
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "공개 요청을 불러오지 못했습니다.");
-          renderFieldRequests(data.requests || []);
+          renderFieldRequests(data.requests || [], !!data.can_apply);
           fieldStatus.textContent = "공개 요청을 불러왔습니다.";
         } catch (error) {
           fieldStatus.textContent = error.message;
         }
       }
 
-      function renderFieldRequests(requests) {
+      function renderFieldRequests(requests, canApply) {
         if (!requests.length) {
           fieldRequestList.innerHTML = '<li class="note-card"><span>공개된 현장 요청이 없습니다.</span></li>';
           return;
@@ -2627,8 +2648,8 @@
           return '<li class="note-card">' +
             '<strong>' + esc(request.public_area || "위치 미정") + '</strong>' +
             '<span>' + esc(meta) + '</span>' +
-            '<span>' + esc([request.cleaning_type, request.space_type, request.reward_text].filter(Boolean).join(" · ")) + '</span>' +
-            '<button class="chip" type="button" data-apply-request="' + escAttr(request.id) + '">방문 신청</button>' +
+            '<span>' + esc([request.cleaning_type, request.space_type, request.reward_text].filter(Boolean).join(" | ")) + '</span>' +
+            (canApply ? '<button class="chip" type="button" data-apply-request="' + escAttr(request.id) + '">\uBC29\uBB38 \uC2E0\uCCAD</button>' : '<span>\uC2B9\uC778\uB41C \uCCAD\uC18C\uC5C5\uCCB4\uB9CC \uC2E0\uCCAD\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.</span>') +
             '<button class="chip" type="button" data-detail-request="' + escAttr(request.id) + '">상세 보기</button>' +
             '</li>';
         }).join("");
