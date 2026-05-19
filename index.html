@@ -749,9 +749,15 @@
       gap: 8px;
     }
 
+    .field-create {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field-create textarea,
     .field-form textarea {
       width: 100%;
-      min-height: 86px;
+      min-height: 140px;
       resize: vertical;
       border: 1px solid var(--line);
       border-radius: 6px;
@@ -760,6 +766,10 @@
       line-height: 1.5;
       padding: 10px;
       outline: none;
+    }
+
+    .field-create button {
+      justify-self: start;
     }
 
     .map-card {
@@ -1587,16 +1597,9 @@
         bindHoChips();
         mountFieldCreateBlock(data);
       }
-
       function renderFieldRequestMount() {
-
-
-        return '<section class="section" id="fieldCreateMount"><h2 class="section-title">?? ?? ??</h2></section>';
-
-
+        return '<section class="section" id="fieldCreateMount"><h2 class="section-title">\uD604\uC7A5 \uACAC\uC801 \uC694\uCCAD</h2></section>';
       }
-
-
 
       function mountFieldCreateBlock(data) {
 
@@ -1675,15 +1678,16 @@
           '</section>'
         ].join("");
       }
-
       function renderHoPickerTools() {
         var count = state.selectedHoNorms.length;
+        var noteText = count ? count + "\uAC1C \uD638 \uC120\uD0DD\uB428" : "\uC5EC\uB7EC \uD638\uB97C \uAC19\uC774 \uB20C\uB7EC \uD569\uC0B0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
+        var mergeLabel = count === 1 ? "\uC120\uD0DD\uD55C \uD638 \uC870\uD68C" : "\uC120\uD0DD\uD55C \uD638 \uD569\uC0B0";
         return [
           '<div class="ho-picker-tools">',
-          '<div class="note">' + esc(count ? count + "개 호 선택됨" : "여러 호를 터치해서 합산할 수 있습니다.") + '</div>',
+          '<div class="note">' + esc(noteText) + '</div>',
           '<div class="ho-picker-actions">',
-          '<button class="chip" type="button" data-merge-selected-ho' + (count ? '' : ' disabled') + '>선택한 호 합산</button>',
-          '<button class="chip" type="button" data-clear-selected-ho' + (count ? '' : ' hidden') + '>선택 해제</button>',
+          '<button class="chip" type="button" data-merge-selected-ho' + (count ? '' : ' disabled') + '>' + esc(mergeLabel) + '</button>',
+          '<button class="chip" type="button" data-clear-selected-ho' + (count ? '' : ' hidden') + '>\uC120\uD0DD \uD574\uC81C</button>',
           '</div>',
           '</div>'
         ].join("");
