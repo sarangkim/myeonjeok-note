@@ -2,10 +2,12 @@ const REQUESTS_TABLE = "field_requests";
 const APPLICATIONS_TABLE = "field_request_applications";
 const PROFILES_TABLE = "user_profiles";
 
-const PUBLIC_REQUEST_COLUMNS = "id,public_area,cleaning_type,space_type,area_pyeong,reward_text,preferred_date,description,status,created_at,updated_at";
-const OWNER_REQUEST_COLUMNS = `${PUBLIC_REQUEST_COLUMNS},address,road,jibun,floor,ho,requester_user_id`;
+const PUBLIC_REQUEST_COLUMNS = "id,public_area,cleaning_type,space_type,area_pyeong,preferred_date,description,status,created_at,updated_at";
+const PROVIDER_REQUEST_COLUMNS = `${PUBLIC_REQUEST_COLUMNS},reward_text`;
+const OWNER_REQUEST_COLUMNS = `${PROVIDER_REQUEST_COLUMNS},address,road,jibun,floor,ho,requester_user_id`;
 const APPLICATION_COLUMNS = "id,request_id,applicant_user_id,message,status,report_status,report_text,estimate_amount,completed_at,created_at,updated_at";
-const PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,bio";
+const BASE_PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,bio";
+const PROFILE_COLUMNS = `${BASE_PROFILE_COLUMNS},member_role,provider_status`;
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -59,8 +61,10 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true, applications: await attachApplicantDetails(applications) });
       }
 
-      const requests = await supabaseRequest(`${REQUESTS_TABLE}?status=eq.open&select=${PUBLIC_REQUEST_COLUMNS}&order=created_at.desc&limit=100`, { method: "GET" });
-      return res.status(200).json({ ok: true, requests: await attachApplicationCounts(requests) });
+      const viewerProfile = user ? await getProfile(user.id) : null;
+      const columns = isApprovedProvider(viewerProfile) ? PROVIDER_REQUEST_COLUMNS : PUBLIC_REQUEST_COLUMNS;
+      const requests = await supabaseRequest(`${REQUESTS_TABLE}?status=eq.open&select=${columns}&order=created_at.desc&limit=100`, { method: "GET" });
+      return res.status(200).json({ ok: true, can_apply: isApprovedProvider(viewerProfile), requests: await attachApplicationCounts(requests) });
     }
 
     if (req.method === "POST") {
@@ -70,6 +74,9 @@ module.exports = async (req, res) => {
       if (body.action === "apply") {
         const requestId = cleanId(body.request_id);
         if (!requestId) return res.status(400).json({ ok: false, message: "요청 ID가 필요합니다." });
+        const profile = await getProfile(user.id);
+        if (!isApprovedProvider(profile)) return res.status(403).json({ ok: false, message: "\uCCAD\uC18C\uC5C5\uCCB4 \uC2B9\uC778 \uD6C4 \uBC29\uBB38 \uC2E0\uCCAD\uC744 \uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4." });
+
         const row = {
           id: makeId(10),
           request_id: requestId,
@@ -184,6 +191,35 @@ async function supabaseRequest(path, options) {
   return Array.isArray(data) ? data : [];
 }
 
+async function getProfile(userId) {
+  try {
+    const rows = await supabaseRequest(PROFILES_TABLE + "?user_id=eq." + encodeURIComponent(userId) + "&select=" + PROFILE_COLUMNS + "&limit=1", { method: "GET" });
+    return rows[0] || null;
+  } catch (error) {
+    if (!isMissingProfileRoleColumns(error)) throw error;
+    const rows = await supabaseRequest(PROFILES_TABLE + "?user_id=eq." + encodeURIComponent(userId) + "&select=" + BASE_PROFILE_COLUMNS + "&limit=1", { method: "GET" });
+    return rows[0] || null;
+  }
+}
+
+async function fetchProfilesByFilter(filter) {
+  try {
+    return await supabaseRequest(PROFILES_TABLE + "?user_id=in.(" + filter + ")&select=" + PROFILE_COLUMNS, { method: "GET" });
+  } catch (error) {
+    if (!isMissingProfileRoleColumns(error)) throw error;
+    return await supabaseRequest(PROFILES_TABLE + "?user_id=in.(" + filter + ")&select=" + BASE_PROFILE_COLUMNS, { method: "GET" });
+  }
+}
+
+function isApprovedProvider(profile) {
+  return !!profile && profile.member_role === "provider" && profile.provider_status === "approved";
+}
+
+function isMissingProfileRoleColumns(error) {
+  const msg = String(error?.message || error || "");
+  return msg.includes("member_role") || msg.includes("provider_status") || msg.includes("schema cache");
+}
+
 async function attachApplicantDetails(applications) {
   if (!applications.length) return applications;
   const uniqueIds = [...new Set(applications.map((app) => app.applicant_user_id).filter(Boolean))];
@@ -239,7 +275,7 @@ async function getProfiles(userIds) {
 
   const filter = userIds.map((id) => encodeURIComponent(id)).join(",");
   try {
-    const rows = await supabaseRequest(`${PROFILES_TABLE}?user_id=in.(${filter})&select=${PROFILE_COLUMNS}`, { method: "GET" });
+    const rows = await fetchProfilesByFilter(filter);
     for (const row of rows) profiles.set(row.user_id, row);
   } catch (error) {
     if (!String(error?.message || error).includes("does not exist") && !String(error?.message || error).includes("schema cache")) throw error;

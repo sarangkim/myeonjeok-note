@@ -2,7 +2,8 @@ const PROFILES_TABLE = "user_profiles";
 const APPLICATIONS_TABLE = "field_request_applications";
 const REQUESTS_TABLE = "field_requests";
 
-const PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,bio,created_at,updated_at";
+const BASE_PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,bio,created_at,updated_at";
+const PROFILE_COLUMNS = `${BASE_PROFILE_COLUMNS},member_role,provider_status,provider_requested_at,provider_approved_at`;
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -26,6 +27,8 @@ module.exports = async (req, res) => {
 
     if (req.method === "POST") {
       const body = await readJson(req);
+      const requestedRole = normalizeMemberRole(body.member_role);
+      const currentProfile = await getProfile(user);
       const row = {
         user_id: user.id,
         email: clamp(user.email, 320),
@@ -34,18 +37,18 @@ module.exports = async (req, res) => {
         phone: clamp(body.phone, 60),
         service_area: clamp(body.service_area, 160),
         bio: clamp(body.bio, 800),
+        member_role: requestedRole,
+        provider_status: nextProviderStatus(currentProfile, requestedRole),
+        provider_requested_at: requestedRole === "provider" && currentProfile.provider_status !== "approved" ? new Date().toISOString() : (currentProfile.provider_requested_at || null),
+        provider_approved_at: currentProfile.provider_approved_at || null,
         updated_at: new Date().toISOString(),
       };
 
-      const updated = await supabaseRequest(`${PROFILES_TABLE}?on_conflict=user_id&select=${PROFILE_COLUMNS}`, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-        body: JSON.stringify(row),
-      });
+      const updated = await upsertProfile(row);
 
       const stats = await getApplicantStats(user.id);
       Object.assign(stats, await getNotificationStats(user.id));
-      const profile = updated[0] || row;
+      const profile = normalizeProfileDefaults(updated[0] || row);
       profile.avatar_url = getAvatarUrl(user);
       return res.status(200).json({ ok: true, profile, stats });
     }
@@ -70,8 +73,8 @@ function assertSupabaseEnv() {
 }
 
 async function getProfile(user) {
-  const rows = await supabaseRequest(`${PROFILES_TABLE}?user_id=eq.${encodeURIComponent(user.id)}&select=${PROFILE_COLUMNS}&limit=1`, { method: "GET" });
-  if (rows.length) return rows[0];
+  const rows = await fetchProfileRows(user.id);
+  if (rows.length) return normalizeProfileDefaults(rows[0]);
   return {
     user_id: user.id,
     email: user.email || "",
@@ -81,7 +84,67 @@ async function getProfile(user) {
     service_area: "",
     bio: "",
     avatar_url: getAvatarUrl(user),
+    member_role: "customer",
+    provider_status: "none",
+    provider_requested_at: null,
+    provider_approved_at: null,
   };
+}
+
+function normalizeMemberRole(value) {
+  return String(value || "customer") === "provider" ? "provider" : "customer";
+}
+
+function nextProviderStatus(current, role) {
+  if (role !== "provider") return "none";
+  if (current && current.provider_status === "approved") return "approved";
+  return "pending";
+}
+
+function normalizeProfileDefaults(profile) {
+  return {
+    ...profile,
+    member_role: profile.member_role || "customer",
+    provider_status: profile.provider_status || (profile.member_role === "provider" ? "pending" : "none"),
+    provider_requested_at: profile.provider_requested_at || null,
+    provider_approved_at: profile.provider_approved_at || null,
+  };
+}
+
+async function fetchProfileRows(userId) {
+  try {
+    return await supabaseRequest(PROFILES_TABLE + "?user_id=eq." + encodeURIComponent(userId) + "&select=" + PROFILE_COLUMNS + "&limit=1", { method: "GET" });
+  } catch (error) {
+    if (!isMissingProfileRoleColumns(error)) throw error;
+    return await supabaseRequest(PROFILES_TABLE + "?user_id=eq." + encodeURIComponent(userId) + "&select=" + BASE_PROFILE_COLUMNS + "&limit=1", { method: "GET" });
+  }
+}
+
+async function upsertProfile(row) {
+  try {
+    return await supabaseRequest(PROFILES_TABLE + "?on_conflict=user_id&select=" + PROFILE_COLUMNS, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify(row),
+    });
+  } catch (error) {
+    if (!isMissingProfileRoleColumns(error)) throw error;
+    const fallback = { ...row };
+    delete fallback.member_role;
+    delete fallback.provider_status;
+    delete fallback.provider_requested_at;
+    delete fallback.provider_approved_at;
+    return await supabaseRequest(PROFILES_TABLE + "?on_conflict=user_id&select=" + BASE_PROFILE_COLUMNS, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify(fallback),
+    });
+  }
+}
+
+function isMissingProfileRoleColumns(error) {
+  const msg = String(error?.message || error || "");
+  return msg.includes("member_role") || msg.includes("provider_status") || msg.includes("provider_requested_at") || msg.includes("provider_approved_at") || msg.includes("schema cache");
 }
 
 function getAvatarUrl(user) {
