@@ -986,8 +986,8 @@
                 <input id="estimateArea" inputmode="decimal" placeholder="조회 후 자동 입력">
               </label>
               <label>
-                월 방문 횟수
-                <input id="estimateVisits" inputmode="numeric" value="4">
+                &#51452; &#48169;&#47928; &#54943;&#49688;
+                <input id="estimateVisits" inputmode="numeric" value="1">
               </label>
               <label>
                 화장실 수
@@ -2247,7 +2247,8 @@
       function calculateEstimate() {
         var type = estimateTypeInput.value;
         var area = toNumber(estimateAreaInput.value || estimateAreaFromResult(state.currentResult));
-        var visits = Math.max(1, Math.round(toNumber(estimateVisitsInput.value) || 4));
+        var weeklyVisits = Math.max(1, Math.round(toNumber(estimateVisitsInput.value) || 1));
+        var monthlyVisits = Math.round(weeklyVisits * 4.345);
         var bathrooms = Math.max(0, Math.round(toNumber(estimateBathroomsInput.value) || 0));
         var rooms = Math.max(0, Math.round(toNumber(estimateRoomsInput.value) || 0));
         var floors = Math.max(1, Math.round(toNumber(estimateFloorsInput.value) || 1));
@@ -2265,20 +2266,20 @@
         }
 
         if (type === "office_regular") {
-          price = regularOfficeMonthly(area, visits);
+          price = regularOfficeMonthly(area, weeklyVisits);
           optionTotal += bathrooms * 8000 + rooms * 4000;
-          lines.push("30평 이하 주 1회 월 20만원대, 31~50평 주 1회 월 30만원대 공개 단가를 기준으로 계산했습니다.");
-          lines.push("월 방문 " + visits + "회, 화장실 " + bathrooms + "개, 방/회의실 " + rooms + "개 반영");
+          lines.push("30\uD3C9 \uC774\uD558 \uC8FC 1\uD68C \uC6D4 20\uB9CC\uC6D0\uB300, 31~50\uD3C9 \uC8FC 1\uD68C \uC6D4 30\uB9CC\uC6D0\uB300 \uAE30\uC900\uC73C\uB85C \uC6D4 \uACC4\uC57D\uAC00\uB97C \uACC4\uC0B0\uD588\uC2B5\uB2C8\uB2E4.");
+          lines.push("\uC8FC \uBC29\uBB38 " + weeklyVisits + "\uD68C(\uC6D4 \uC57D " + monthlyVisits + "\uD68C) \uBC18\uC601");
         } else if (type === "hospital_regular") {
-          price = regularOfficeMonthly(area, visits) * 1.35;
+          price = regularOfficeMonthly(area, weeklyVisits) * 1.22;
           optionTotal += bathrooms * 12000 + rooms * 8000;
           lines.push("병원은 일반 사무실 정기청소에 위생·소독 관리 부담을 35% 가산했습니다.");
-          lines.push("월 방문 " + visits + "회, 진료실 " + rooms + "개, 화장실 " + bathrooms + "개 반영");
+          lines.push("\uC8FC \uBC29\uBB38 " + weeklyVisits + "\uD68C(\uC6D4 \uC57D " + monthlyVisits + "\uD68C) \uBC18\uC601");
         } else if (type === "academy_regular") {
-          price = regularOfficeMonthly(area, visits) * 1.18;
+          price = regularOfficeMonthly(area, weeklyVisits) * 1.12;
           optionTotal += bathrooms * 9000 + rooms * 6000;
           lines.push("학원은 일반 사무실 정기청소에 책상·강의실 반복 사용 부담을 18% 가산했습니다.");
-          lines.push("월 방문 " + visits + "회, 강의실 " + rooms + "개, 화장실 " + bathrooms + "개 반영");
+          lines.push("\uC8FC \uBC29\uBB38 " + weeklyVisits + "\uD68C(\uC6D4 \uC57D " + monthlyVisits + "\uD68C) \uBC18\uC601");
         } else if (type === "office_movein") {
           price = Math.max(250000, area * 18000);
           optionTotal += bathrooms * 18000 + rooms * 7000;
@@ -2297,10 +2298,10 @@
           optionTotal += bathrooms * 22000;
           lines.push("아파트 입주청소 공개 단가 평당 10,000~15,500원과 20~30평대 가격표를 기준으로 계산했습니다.");
         } else if (type === "villa_stairs") {
-          price = Math.max(35000, floors * 12000 + households * 1200) * Math.max(1, visits / 4);
+          price = Math.max(35000, floors * 10000 + households * 1000) * Math.max(1, weeklyVisits);
           optionTotal += estimateWasteInput.checked ? 25000 : 0;
           lines.push("빌라 계단청소 공개 사례인 4~5층 월 1회 35,000원, 5층 월 4회 6~7만원을 기준으로 계산했습니다.");
-          lines.push("계단 " + floors + "층, " + households + "세대, 월 방문 " + visits + "회 반영");
+          lines.push("\uC8FC \uBC29\uBB38 " + weeklyVisits + "\uD68C(\uC6D4 \uC57D " + monthlyVisits + "\uD68C) \uBC18\uC601");
         }
 
         if (estimateWindowInput.checked) optionTotal += Math.max(30000, area * 1200);
@@ -2319,14 +2320,18 @@
         return { ok: true, label: label, low: low, high: high, lines: lines };
       }
 
-      function regularOfficeMonthly(area, visits) {
-        var once;
-        if (area <= 30) once = 200000;
-        else if (area <= 50) once = 300000;
-        else once = 300000 + (area - 50) * 5000;
-        var weeklyVisits = Math.max(0.25, visits / 4);
-        var visitFactor = weeklyVisits <= 1 ? weeklyVisits : 1 + (weeklyVisits - 1) * 0.65;
-        return once * visitFactor;
+      function regularOfficeMonthly(area, weeklyVisits) {
+        var base;
+        if (area <= 30) base = 220000;
+        else if (area <= 50) base = 300000;
+        else if (area <= 100) base = 300000 + (area - 50) * 5000;
+        else base = 550000 + (area - 100) * 3500;
+
+        var visits = Math.max(1, weeklyVisits);
+        var visitFactor = 1;
+        if (visits <= 3) visitFactor = 1 + (visits - 1) * 0.58;
+        else visitFactor = 2.16 + (visits - 3) * 0.42;
+        return base * visitFactor;
       }
 
       function formatWonRange(low, high) {
