@@ -635,6 +635,19 @@
       gap: 8px;
     }
 
+    .estimate-extra textarea {
+      width: 100%;
+      min-height: 82px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      font: 14px var(--font);
+      line-height: 1.5;
+      padding: 10px;
+      outline: none;
+    }
+
     .estimate-result {
       display: grid;
       gap: 8px;
@@ -1026,6 +1039,10 @@
               <input id="estimateOffhour" type="checkbox">
               야간·주말 작업
             </label>
+            <label class="estimate-extra">
+              &#52628;&#44032;&#49324;&#54637;
+              <textarea id="estimateNotes" placeholder="&#50696;: &#50648;&#47532;&#48288;&#51060;&#53552; &#50630;&#51020;, &#51452;&#52264; &#50612;&#47140;&#50880;, &#50976;&#47532;&#52285; &#47566;&#51020;, &#51089;&#50629; &#49884;&#44036; &#51228;&#54620; &#46321;"></textarea>
+            </label>
             <button id="calculateEstimateBtn" type="button">견적 계산</button>
             <div class="estimate-result" id="estimateResult">
               <div class="note">주소와 호실을 조회하면 면적이 자동으로 들어갑니다.</div>
@@ -1114,6 +1131,7 @@
       var estimateFloorCareInput = document.getElementById("estimateFloorCare");
       var estimateWasteInput = document.getElementById("estimateWaste");
       var estimateOffhourInput = document.getElementById("estimateOffhour");
+      var estimateNotesInput = document.getElementById("estimateNotes");
       var calculateEstimateBtn = document.getElementById("calculateEstimateBtn");
       var estimateResult = document.getElementById("estimateResult");
       var accountButton = document.getElementById("accountButton");
@@ -2236,6 +2254,7 @@
         var households = Math.max(0, Math.round(toNumber(estimateHouseholdsInput.value) || 0));
         var dirt = ({ low: 0.92, normal: 1, high: 1.18, severe: 1.38 })[estimateDirtInput.value] || 1;
         var furniture = ({ empty: 1, some: 1.08, many: 1.2 })[estimateFurnitureInput.value] || 1;
+        var extraNotes = estimateNotesInput.value.trim();
         var optionTotal = 0;
         var lines = [];
         var label = estimateTypeInput.options[estimateTypeInput.selectedIndex].text;
@@ -2296,6 +2315,7 @@
         lines.unshift(type === "villa_stairs" ? "예상 월 견적입니다." : "예상 1회 견적입니다.");
         if (type.indexOf("regular") !== -1) lines[0] = "예상 월 견적입니다.";
         lines.push("오염도 " + estimateDirtInput.options[estimateDirtInput.selectedIndex].text + ", 집기 " + estimateFurnitureInput.options[estimateFurnitureInput.selectedIndex].text + " 반영");
+        if (extraNotes) lines.push("\uCD94\uAC00\uC0AC\uD56D: " + extraNotes);
         return { ok: true, label: label, low: low, high: high, lines: lines };
       }
 
