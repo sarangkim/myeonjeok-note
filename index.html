@@ -875,6 +875,7 @@
           <button type="button" data-side-view="mine">&#45236; &#50836;&#52397;</button>
           <button type="button" data-side-view="applied">&#45236; &#49888;&#52397;</button>
           <button type="button" data-side-view="board">&#44172;&#49884;&#54032;</button>
+          <button type="button" data-side-view="adminProviders" id="adminProvidersMenu" hidden>&#50629;&#52404; &#49849;&#51064;</button>
         </div>
       </nav>
 
@@ -889,8 +890,8 @@
           <div class="profile-form" id="profileForm" hidden>
             <input id="profileDisplayName" placeholder="이름 또는 담당자명">
             <select id="profileMemberRole">
-              <option value="customer">일반 회원</option>
-              <option value="provider">청소업체/사장님</option>
+              <option value="customer">&#51068;&#48152; &#54924;&#50896;</option>
+              <option value="provider">&#52397;&#49548;&#50629;&#52404;/&#49324;&#51109;&#45784;</option>
             </select>
 
             <input id="profileCompanyName" placeholder="업체명">
@@ -1066,6 +1067,16 @@
           <ul class="note-list" id="boardList"></ul>
         </div>
 
+        <div class="side-panel" id="adminProvidersPanel" hidden>
+          <h2>&#50629;&#52404; &#49849;&#51064;</h2>
+          <div class="button-row">
+            <button class="secondary" id="loadPendingProvidersBtn" type="button">&#49849;&#51064; &#45824;&#44592;</button>
+            <button class="secondary" id="loadApprovedProvidersBtn" type="button">&#49849;&#51064;&#46108; &#50629;&#52404;</button>
+          </div>
+          <div class="note" id="adminProvidersStatus"></div>
+          <ul class="note-list" id="adminProvidersList"></ul>
+        </div>
+
         <div class="side-panel" id="requestsPanel" hidden>
           <h2 id="requestsPanelTitle">공개 요청</h2>
           <div class="field-form">
@@ -1198,6 +1209,7 @@
         authSession: null,
         profile: null,
         profileStats: null,
+        isAdmin: false,
         selectedHoNorms: [],
         boardCurrentPost: null,
         boardPosts: [],
@@ -1266,6 +1278,8 @@
       loadMyFieldRequestsBtn.addEventListener("click", loadMyFieldRequests);
       loadAppliedFieldRequestsBtn.addEventListener("click", loadAppliedFieldRequests);
       createBoardPostBtn.addEventListener("click", createBoardPost);
+      loadPendingProvidersBtn.addEventListener("click", function () { loadProviderApprovals("pending"); });
+      loadApprovedProvidersBtn.addEventListener("click", function () { loadProviderApprovals("approved"); });
       sideTabButtons.forEach(function (button) {
         button.addEventListener("click", function () {
           selectSideView(button.getAttribute("data-side-view"));
@@ -2043,6 +2057,8 @@
           } else {
             state.profile = null;
             state.profileStats = null;
+            state.isAdmin = false;
+            updateAdminMenu();
             renderLocalSavedNotes();
             updateAuthUi();
           }
@@ -2122,6 +2138,8 @@
         state.authSession = null;
         state.profile = null;
         state.profileStats = null;
+        state.isAdmin = false;
+        updateAdminMenu();
         updateAuthUi();
         renderLocalSavedNotes();
       }
@@ -2192,8 +2210,15 @@
         closeMainMenu();
       }
 
+      function updateAdminMenu() {
+        if (!adminProvidersMenu) return;
+        adminProvidersMenu.hidden = !state.isAdmin;
+        if (!state.isAdmin && !adminProvidersPanel.hidden) selectSideView("notes");
+      }
+
       function selectSideView(view) {
         closeMainMenu();
+        if (view === "adminProviders" && !state.isAdmin) view = "notes";
         sideTabButtons.forEach(function (button) {
           button.classList.toggle("active", button.getAttribute("data-side-view") === view);
         });
@@ -2201,26 +2226,30 @@
         var isNotes = view === "notes";
         var isEstimate = view === "estimate";
         var isBoard = view === "board";
+        var isAdminProviders = view === "adminProviders";
         notesPanel.hidden = !isNotes;
         estimatePanel.hidden = !isEstimate;
         boardPanel.hidden = !isBoard;
-        requestsPanel.hidden = isNotes || isEstimate || isBoard;
+        adminProvidersPanel.hidden = !isAdminProviders;
+        requestsPanel.hidden = isNotes || isEstimate || isBoard || isAdminProviders;
         fieldCreateBlock.hidden = true;
 
         if (isEstimate) {
           syncEstimateArea(state.currentResult);
           renderEstimate();
         } else if (view === "public") {
-          requestsPanelTitle.textContent = "공개 요청";
+          requestsPanelTitle.textContent = "\uACF5\uAC1C \uC694\uCCAD";
           loadFieldRequests();
         } else if (view === "mine") {
-          requestsPanelTitle.textContent = "내 요청";
+          requestsPanelTitle.textContent = "\uB0B4 \uC694\uCCAD";
           loadMyFieldRequests();
         } else if (view === "applied") {
-          requestsPanelTitle.textContent = "내 신청";
+          requestsPanelTitle.textContent = "\uB0B4 \uC2E0\uCCAD";
           loadAppliedFieldRequests();
         } else if (isBoard) {
           loadBoardPosts();
+        } else if (isAdminProviders) {
+          loadProviderApprovals("pending");
         }
       }
 
@@ -2363,6 +2392,8 @@
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "프로필을 불러오지 못했습니다.");
           state.profile = data.profile || null;
           state.profileStats = data.stats || null;
+          state.isAdmin = !!data.is_admin;
+          updateAdminMenu();
           fillProfileForm();
           profileForm.hidden = true;
           renderAccountProfile();
@@ -2395,6 +2426,8 @@
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "프로필 저장에 실패했습니다.");
           state.profile = data.profile || null;
           state.profileStats = data.stats || null;
+          state.isAdmin = !!data.is_admin;
+          updateAdminMenu();
           fillProfileForm();
           profileForm.hidden = true;
           renderAccountProfile();
@@ -2915,6 +2948,54 @@
         }
       }
 
+
+
+      async function loadProviderApprovals(status) {
+        if (!state.isAdmin) {
+          adminProvidersStatus.textContent = "\uAD00\uB9AC\uC790\uB9CC \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
+          return;
+        }
+        adminProvidersStatus.textContent = "\uC5C5\uCCB4 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.";
+        try {
+          var response = await fetch("/api/profile", { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ action: "list_providers", status: status || "pending" }) });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "\uC5C5\uCCB4 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+          renderProviderApprovals(data.providers || []);
+          adminProvidersStatus.textContent = status === "approved" ? "\uC2B9\uC778\uB41C \uC5C5\uCCB4 \uBAA9\uB85D\uC785\uB2C8\uB2E4." : "\uC2B9\uC778 \uB300\uAE30 \uC5C5\uCCB4 \uBAA9\uB85D\uC785\uB2C8\uB2E4.";
+        } catch (error) {
+          adminProvidersStatus.textContent = error.message;
+        }
+      }
+
+      function renderProviderApprovals(providers) {
+        if (!providers.length) {
+          adminProvidersList.innerHTML = '<li class="note-card"><span>\uD45C\uC2DC\uD560 \uC5C5\uCCB4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.</span></li>';
+          return;
+        }
+        adminProvidersList.innerHTML = providers.map(function (profile) {
+          var title = profile.company_name || profile.display_name || profile.email || "\uC5C5\uCCB4\uBA85 \uBBF8\uC785\uB825";
+          var meta = [profile.email, profile.phone, profile.service_area, memberRoleText(profile)].filter(Boolean).join(" | ");
+          return '<li class="note-card"><strong>' + esc(title) + '</strong><span>' + esc(meta) + '</span>' + (profile.bio ? '<span>' + esc(profile.bio) + '</span>' : '') + '<div class="button-row"><button class="chip" type="button" data-provider-approve="' + escAttr(profile.user_id) + '">\uC2B9\uC778</button><button class="chip" type="button" data-provider-reject="' + escAttr(profile.user_id) + '">\uAC70\uC808</button></div></li>';
+        }).join("");
+        adminProvidersList.querySelectorAll("[data-provider-approve]").forEach(function (button) {
+          button.addEventListener("click", function () { setProviderStatus(button.getAttribute("data-provider-approve"), "approved"); });
+        });
+        adminProvidersList.querySelectorAll("[data-provider-reject]").forEach(function (button) {
+          button.addEventListener("click", function () { setProviderStatus(button.getAttribute("data-provider-reject"), "rejected"); });
+        });
+      }
+
+      async function setProviderStatus(userId, status) {
+        adminProvidersStatus.textContent = status === "approved" ? "\uC5C5\uCCB4\uB97C \uC2B9\uC778\uD558\uB294 \uC911\uC785\uB2C8\uB2E4." : "\uC5C5\uCCB4\uB97C \uAC70\uC808\uD558\uB294 \uC911\uC785\uB2C8\uB2E4.";
+        try {
+          var response = await fetch("/api/profile", { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ action: "set_provider_status", user_id: userId, provider_status: status }) });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "\uC5C5\uCCB4 \uC0C1\uD0DC \uBCC0\uACBD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+          loadProviderApprovals("pending");
+        } catch (error) {
+          adminProvidersStatus.textContent = error.message;
+        }
+      }
 
       async function createBoardPost() {
         if (!state.authSession) {
