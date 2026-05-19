@@ -302,6 +302,22 @@
       padding: 18px;
     }
 
+    .top-ad-slot {
+      display: block;
+      min-height: 90px;
+      margin: 12px 0;
+    }
+
+    .top-ad-slot[hidden] {
+      display: none;
+    }
+
+    .top-ad-slot .adsbygoogle {
+      display: block;
+      width: 100%;
+      min-height: 90px;
+    }
+
     .search-grid {
       display: grid;
       grid-template-columns: minmax(280px, 1.5fr) minmax(150px, 0.45fr) minmax(150px, 0.45fr);
@@ -933,6 +949,8 @@
       </div>
     </form>
 
+    <div class="top-ad-slot" id="topAdSlot" aria-label="광고" hidden></div>
+
     <div class="workspace no-results" id="workspace">
       <main class="results" id="results"></main>
       <aside class="note-panel">
@@ -1116,6 +1134,7 @@
       var floorBtn = document.getElementById("floorBtn");
       var resetBtn = document.getElementById("resetBtn");
       var statusEl = document.getElementById("status");
+      var topAdSlot = document.getElementById("topAdSlot");
       var workspaceEl = document.getElementById("workspace");
       var resultsEl = document.getElementById("results");
       var noteList = document.getElementById("noteList");
@@ -1288,6 +1307,7 @@
       new MutationObserver(updateWorkspaceLayout).observe(resultsEl, { childList: true });
 
       initAuth();
+      initAds();
       loadSharedNoteFromUrl();
       updateWorkspaceLayout();
 
@@ -1313,6 +1333,44 @@
         } finally {
           setBusy(false);
         }
+      }
+
+      async function initAds() {
+        try {
+          var response = await fetch("/api/public-config");
+          var data = await response.json().catch(function () { return null; });
+          var adsense = data && data.adsense ? data.adsense : {};
+          if (!response.ok || !adsense.client || !adsense.topSlot) return;
+
+          topAdSlot.hidden = false;
+          topAdSlot.innerHTML = '<ins class="adsbygoogle" data-ad-client="' + escAttr(adsense.client) + '" data-ad-slot="' + escAttr(adsense.topSlot) + '" data-ad-format="auto" data-full-width-responsive="true"></ins>';
+          await loadAdsenseScript(adsense.client);
+          window.adsbygoogle = window.adsbygoogle || [];
+          window.adsbygoogle.push({});
+        } catch (error) {
+          topAdSlot.hidden = true;
+        }
+      }
+
+      function loadAdsenseScript(client) {
+        return new Promise(function (resolve) {
+          var existing = document.querySelector('script[data-adsense-script="true"]');
+          if (existing) {
+            resolve(true);
+            return;
+          }
+          var script = document.createElement("script");
+          script.async = true;
+          script.crossOrigin = "anonymous";
+          script.dataset.adsenseScript = "true";
+          script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" + encodeURIComponent(client);
+          script.onload = function () { resolve(true); };
+          script.onerror = function () {
+            topAdSlot.hidden = true;
+            resolve(false);
+          };
+          document.head.appendChild(script);
+        });
       }
 
       async function loadSummary() {
