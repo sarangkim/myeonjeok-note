@@ -292,6 +292,27 @@
       outline: none;
     }
 
+    .inline-status {
+      display: none;
+      border: 1px solid rgba(30, 111, 92, 0.2);
+      border-radius: 12px;
+      background: rgba(229, 242, 238, 0.82);
+      color: var(--brand-strong);
+      font-size: 14px;
+      font-weight: 800;
+      padding: 11px 12px;
+    }
+
+    .inline-status.show {
+      display: block;
+    }
+
+    .inline-status.error {
+      border-color: rgba(164, 61, 53, 0.24);
+      background: rgba(255, 239, 237, 0.88);
+      color: var(--danger);
+    }
+
     .search-panel {
       display: grid;
       gap: 14px;
@@ -1343,6 +1364,7 @@
               <input id="fieldDate" placeholder="희망 방문일 예: 이번 주 평일">
               <textarea id="fieldDescription" placeholder="요청 내용을 적어주세요. 상세 주소는 승인 전 공개되지 않습니다."></textarea>
               <button id="createFieldRequestBtn" type="button">현장 견적 요청 등록</button>
+              <div class="inline-status" id="fieldCreateStatus" role="status" aria-live="polite"></div>
             </div>
             <div class="legacy-field-actions" hidden>
               <button class="secondary" id="loadFieldRequestsBtn" type="button">공개 요청 보기</button>
@@ -1431,6 +1453,7 @@
       var fieldDateInput = document.getElementById("fieldDate");
       var fieldDescriptionInput = document.getElementById("fieldDescription");
       var createFieldRequestBtn = document.getElementById("createFieldRequestBtn");
+      var fieldCreateStatus = document.getElementById("fieldCreateStatus");
       var loadFieldRequestsBtn = document.getElementById("loadFieldRequestsBtn");
       var loadMyFieldRequestsBtn = document.getElementById("loadMyFieldRequestsBtn");
       var loadAppliedFieldRequestsBtn = document.getElementById("loadAppliedFieldRequestsBtn");
@@ -1519,6 +1542,7 @@
       topLoginBtn.addEventListener("click", requestLoginLink);
       topGoogleLoginBtn.addEventListener("click", loginWithGoogle);
       topLogoutBtn.addEventListener("click", logout);
+      profileMemberRoleInput.addEventListener("change", updateProfilePlaceholders);
       saveProfileBtn.addEventListener("click", saveProfile);
       document.addEventListener("click", function (event) {
         closeAccountMenuOnOutsideClick(event);
@@ -2548,6 +2572,12 @@
         if (!show) fieldRewardInput.value = "";
       }
 
+      function setFieldCreateStatus(message, type) {
+        fieldStatus.textContent = message || "";
+        fieldCreateStatus.textContent = message || "";
+        fieldCreateStatus.className = "inline-status" + (message ? " show" : "") + (type ? " " + type : "");
+      }
+
       function selectSideView(view) {
         closeMainMenu();
         if (view === "adminProviders" && !state.isAdmin) view = "notes";
@@ -2780,6 +2810,17 @@
         profilePhoneInput.value = profile.phone || "";
         profileServiceAreaInput.value = profile.service_area || "";
         profileBioInput.value = profile.bio || "";
+        updateProfilePlaceholders();
+      }
+
+      function updateProfilePlaceholders() {
+        var isProvider = profileMemberRoleInput.value === "provider";
+        profileServiceAreaInput.placeholder = isProvider
+          ? "\uD65C\uB3D9\uC9C0\uC5ED \uC608: \uC11C\uC6B8 \uAC15\uC11C\uAD6C, \uB9C8\uD3EC\uAD6C"
+          : "\uC9C0\uC5ED \uC608: \uC11C\uC6B8 \uAC15\uC11C\uAD6C, \uB9C8\uD3EC\uAD6C";
+        profileBioInput.placeholder = isProvider
+          ? "\uC18C\uAC1C \uC608: \uC0AC\uBB34\uC2E4 \uC815\uAE30\uCCAD\uC18C\uC640 \uC785\uC8FC\uCCAD\uC18C\uB97C \uC8FC\uB85C \uD569\uB2C8\uB2E4."
+          : "\uC18C\uAC1C \uC608: \uC0AC\uBB34\uC2E4 \uC815\uAE30\uCCAD\uC18C \uC5C5\uCCB4\uB97C \uCC3E\uC2B5\uB2C8\uB2E4.";
       }
 
       function renderAccountProfile() {
@@ -2946,11 +2987,11 @@
 
       async function createFieldRequest() {
         if (!state.authSession) {
-          fieldStatus.textContent = "현장 요청 등록은 로그인이 필요합니다.";
+          setFieldCreateStatus("현장 요청 등록은 로그인이 필요합니다.", "error");
           return;
         }
         if (!state.currentResult) {
-          fieldStatus.textContent = "먼저 주소와 면적을 조회해주세요.";
+          setFieldCreateStatus("먼저 주소와 면적을 조회해주세요.", "error");
           return;
         }
 
@@ -2972,11 +3013,12 @@
         };
 
         if (!payload.public_area || !payload.cleaning_type) {
-          fieldStatus.textContent = "공개 위치와 청소 종류를 입력해주세요.";
+          setFieldCreateStatus("공개 위치와 청소 종류를 입력해주세요.", "error");
           return;
         }
 
-        fieldStatus.textContent = "현장 요청을 등록하는 중입니다.";
+        createFieldRequestBtn.disabled = true;
+        setFieldCreateStatus("현장 요청을 등록하는 중입니다.");
         try {
           var response = await fetch("/api/field-requests", {
             method: "POST",
@@ -2985,10 +3027,13 @@
           });
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "현장 요청 등록에 실패했습니다.");
-          fieldStatus.textContent = "현장 요청을 등록했습니다.";
-          loadMyFieldRequests();
+          setFieldCreateStatus("등록되었습니다. 내 요청 메뉴에서 신청 현황을 확인할 수 있습니다.");
+          fieldDescriptionInput.value = "";
+          loadProfile();
         } catch (error) {
-          fieldStatus.textContent = error.message;
+          setFieldCreateStatus(error.message, "error");
+        } finally {
+          createFieldRequestBtn.disabled = false;
         }
       }
 
