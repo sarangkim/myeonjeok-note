@@ -1339,7 +1339,7 @@
               <input id="fieldPublicArea" placeholder="공개 위치 예: 서울 강서구 마곡동">
               <input id="fieldCleaningType" placeholder="청소 종류 예: 사무실 정기청소">
               <input id="fieldSpaceType" placeholder="공간 유형 예: 사무실, 상가">
-              <input id="fieldReward" placeholder="보상 조건 예: 성사 시 2배 수수료">
+              <input id="fieldReward" placeholder="보상 조건 예: 성사 시 2배 수수료" hidden>
               <input id="fieldDate" placeholder="희망 방문일 예: 이번 주 평일">
               <textarea id="fieldDescription" placeholder="요청 내용을 적어주세요. 상세 주소는 승인 전 공개되지 않습니다."></textarea>
               <button id="createFieldRequestBtn" type="button">현장 견적 요청 등록</button>
@@ -1972,6 +1972,7 @@
 
 
         fieldCreateBlock.hidden = false;
+        updateFieldRewardVisibility();
 
 
         prefillFieldRequest(data || state.currentResult || {});
@@ -2486,6 +2487,7 @@
         authStatus.textContent = user
           ? ""
           : "로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.";
+        updateFieldRewardVisibility();
         renderAccountProfile();
       }
 
@@ -2533,6 +2535,17 @@
         if (!adminProvidersMenu) return;
         adminProvidersMenu.hidden = !state.isAdmin;
         if (!state.isAdmin && !adminProvidersPanel.hidden) selectSideView("notes");
+      }
+
+      function canSeeProviderTerms() {
+        var profile = state.profile || {};
+        return !!state.isAdmin || (profile.member_role === "provider" && profile.provider_status === "approved");
+      }
+
+      function updateFieldRewardVisibility() {
+        var show = canSeeProviderTerms();
+        fieldRewardInput.hidden = !show;
+        if (!show) fieldRewardInput.value = "";
       }
 
       function selectSideView(view) {
@@ -2713,6 +2726,7 @@
           state.profileStats = data.stats || null;
           state.isAdmin = !!data.is_admin;
           updateAdminMenu();
+          updateFieldRewardVisibility();
           fillProfileForm();
           profileForm.hidden = true;
           renderAccountProfile();
@@ -2747,6 +2761,7 @@
           state.profileStats = data.stats || null;
           state.isAdmin = !!data.is_admin;
           updateAdminMenu();
+          updateFieldRewardVisibility();
           fillProfileForm();
           profileForm.hidden = true;
           renderAccountProfile();
@@ -2951,7 +2966,7 @@
           cleaning_type: fieldCleaningTypeInput.value.trim(),
           space_type: fieldSpaceTypeInput.value.trim(),
           area_pyeong: result.sum && result.sum.total_pyeong ? result.sum.total_pyeong : null,
-          reward_text: fieldRewardInput.value.trim(),
+          reward_text: canSeeProviderTerms() ? fieldRewardInput.value.trim() : "",
           preferred_date: fieldDateInput.value.trim(),
           description: fieldDescriptionInput.value.trim()
         };
