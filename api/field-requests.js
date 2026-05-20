@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
 
         const rows = await supabaseRequest(`${REQUESTS_TABLE}?id=eq.${encodeURIComponent(requestId)}&select=${OWNER_REQUEST_COLUMNS}`, { method: "GET" });
         if (!rows.length) return res.status(404).json({ ok: false, message: "요청을 찾을 수 없습니다." });
-        return res.status(200).json({ ok: true, request: rows[0], access: "approved_applicant" });
+        return res.status(200).json({ ok: true, request: await attachRequesterContact(rows[0]), access: "approved_applicant" });
       }
 
       if (String(req.query.mine || "") === "1") {
@@ -200,6 +200,24 @@ async function getProfile(userId) {
     const rows = await supabaseRequest(PROFILES_TABLE + "?user_id=eq." + encodeURIComponent(userId) + "&select=" + BASE_PROFILE_COLUMNS + "&limit=1", { method: "GET" });
     return rows[0] || null;
   }
+}
+
+async function attachRequesterContact(request) {
+  if (!request?.requester_user_id) return request;
+  const [profile, authUser] = await Promise.all([
+    getProfile(request.requester_user_id),
+    getAuthUserSummary(request.requester_user_id),
+  ]);
+
+  return {
+    ...request,
+    requester_contact: {
+      name: profile?.display_name || authUser.email || "",
+      email: authUser.email || "",
+      phone: profile?.phone || "",
+      region: profile?.service_area || "",
+    },
+  };
 }
 
 async function fetchProfilesByFilter(filter) {
