@@ -1469,10 +1469,12 @@
     <footer class="site-footer">
       <div class="footer-links">
         <strong>견적노트</strong>
-        <span>문의: 77happycleaning@gmail.com</span>
+        <span>개인정보 보호책임자: 행복한청소</span>
+        <span>사업자등록번호: 575-54-00467</span>
+        <span>주소: 서울시 강서구 허준로 198</span>
+        <span>문의: contact@happycleaning.co.kr</span>
         <button class="footer-link" type="button" data-policy="privacy">개인정보처리방침</button>
         <button class="footer-link" type="button" data-policy="terms">이용약관</button>
-        <span>사업자 정보는 정식 운영 전 실제 정보로 교체하세요.</span>
       </div>
       <div>평수 조회 결과와 청소견적은 공공데이터 및 입력값을 바탕으로 한 참고 정보이며, 실제 계약 전 현장 확인이 필요합니다.</div>
     </footer>
@@ -1920,9 +1922,9 @@
           '<h3>처리 위탁 및 국외 이전 가능성</h3>',
           '<p>서비스 운영을 위해 Vercel, Supabase, Google OAuth 등 외부 클라우드 서비스를 사용합니다. 각 서비스의 서버 위치와 정책에 따라 국외 처리 또는 이전이 발생할 수 있습니다.</p>',
           '<h3>정보주체 권리</h3>',
-          '<p>이용자는 개인정보 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 문의: 77happycleaning@gmail.com</p>',
+          '<p>이용자는 개인정보 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 문의: contact@happycleaning.co.kr</p>',
           '<h3>고지</h3>',
-          '<p>본 방침은 서비스 정식 운영 전 초안입니다. 사업자 정보, 개인정보 보호책임자, 보관 기간, 위탁/이전 세부 내용은 실제 운영 방식에 맞게 보완해야 합니다.</p>'
+          '<p>개인정보 보호책임자: 행복한청소 / 사업자등록번호: 575-54-00467 / 주소: 서울시 강서구 허준로 198 / 문의: contact@happycleaning.co.kr</p>'
         ].join("");
       }
 
@@ -1936,7 +1938,7 @@
           '<h3>게시물 관리</h3>',
           '<p>운영자는 부적절한 게시글, 댓글, 현장 요청을 숨김 또는 삭제할 수 있습니다.</p>',
           '<h3>사업자 정보</h3>',
-          '<p>상호, 대표자, 사업자등록번호, 주소, 연락처, 통신판매업 신고번호 등은 정식 상업 운영 전 실제 정보로 교체해야 합니다.</p>'
+          '<p>개인정보 보호책임자: 행복한청소<br>사업자등록번호: 575-54-00467<br>주소: 서울시 강서구 허준로 198<br>문의: contact@happycleaning.co.kr</p>'
         ].join("");
       }
 
@@ -3402,11 +3404,25 @@
         }
       }
 
+      function requesterContactHtml(request, access) {
+        if (access !== "approved_applicant" || !request.requester_contact) return "";
+        var contact = request.requester_contact;
+        var rows = [
+          contact.name ? "요청자: " + contact.name : "",
+          contact.phone ? "연락처: " + contact.phone : "",
+          contact.email ? "이메일: " + contact.email : "",
+          contact.region ? "지역: " + contact.region : ""
+        ].filter(Boolean);
+        if (!rows.length) return '<span>요청자 연락처가 없습니다. 신청 메시지를 확인하거나 운영자에게 문의해주세요.</span>';
+        return '<span>' + esc(rows.join(" · ")) + '</span>';
+      }
+
       function renderFieldRequestDetail(request, access) {
         fieldRequestList.innerHTML = '<li class="note-card">' +
           '<strong>' + esc(access === "owner" ? "내 요청 상세주소" : "승인된 요청 상세주소") + '</strong>' +
           '<span>' + esc(request.road || request.address || "-") + '</span>' +
           '<span>' + esc(formatFieldLocation(request)) + '</span>' +
+          requesterContactHtml(request, access) +
           '<span>' + esc(request.description || "") + '</span>' +
           '</li><li class="note-card"><button class="chip" type="button" data-load-public-requests="1">공개 요청으로 돌아가기</button></li>';
 
