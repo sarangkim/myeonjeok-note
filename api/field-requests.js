@@ -7,7 +7,7 @@ const PROVIDER_REQUEST_COLUMNS = `${PUBLIC_REQUEST_COLUMNS},reward_text`;
 const OWNER_REQUEST_COLUMNS = `${PROVIDER_REQUEST_COLUMNS},address,road,jibun,floor,ho,requester_user_id`;
 const APPLICATION_COLUMNS = "id,request_id,applicant_user_id,message,status,report_status,report_text,estimate_amount,completed_at,created_at,updated_at";
 const BASE_PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,bio";
-const PROFILE_COLUMNS = `${BASE_PROFILE_COLUMNS},member_role,provider_status`;
+const PROFILE_COLUMNS = `${BASE_PROFILE_COLUMNS},member_role,provider_status,provider_penalty_count,provider_suspended_at`;
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -126,12 +126,81 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true, application: updated[0] });
       }
 
+      if (body.action === "confirm_visit") {
+        const applicationId = cleanId(body.application_id);
+        if (!applicationId) return res.status(400).json({ ok: false, message: "신청 ID가 필요합니다." });
+
+        const applicationRows = await supabaseRequest(`${APPLICATIONS_TABLE}?id=eq.${encodeURIComponent(applicationId)}&select=${APPLICATION_COLUMNS}`, { method: "GET" });
+        if (!applicationRows.length) return res.status(404).json({ ok: false, message: "신청을 찾을 수 없습니다." });
+
+        const app = applicationRows[0];
+        const ownerRows = await supabaseRequest(`${REQUESTS_TABLE}?id=eq.${encodeURIComponent(app.request_id)}&requester_user_id=eq.${encodeURIComponent(user.id)}&select=id`, { method: "GET" });
+        if (!ownerRows.length) return res.status(403).json({ ok: false, message: "요청 작성자만 방문을 확인할 수 있습니다." });
+        if (!await isBusinessVisitFlow(user.id, app.applicant_user_id)) {
+          return res.status(403).json({ ok: false, message: "사업자 간 현장 방문 요청에서만 방문 확인을 사용할 수 있습니다." });
+        }
+        if (!["visited", "quoted"].includes(app.report_status)) {
+          return res.status(400).json({ ok: false, message: "방문 완료 또는 견적 제출 상태만 확인할 수 있습니다." });
+        }
+
+        const updated = await supabaseRequest(`${APPLICATIONS_TABLE}?id=eq.${encodeURIComponent(applicationId)}&select=${APPLICATION_COLUMNS}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            report_status: "confirmed_visit",
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }),
+        });
+        return res.status(200).json({ ok: true, application: updated[0] });
+      }
+
+      if (body.action === "penalize_provider") {
+        const applicationId = cleanId(body.application_id);
+        if (!applicationId) return res.status(400).json({ ok: false, message: "신청 ID가 필요합니다." });
+
+        const applicationRows = await supabaseRequest(`${APPLICATIONS_TABLE}?id=eq.${encodeURIComponent(applicationId)}&select=${APPLICATION_COLUMNS}`, { method: "GET" });
+        if (!applicationRows.length) return res.status(404).json({ ok: false, message: "신청을 찾을 수 없습니다." });
+
+        const app = applicationRows[0];
+        const ownerRows = await supabaseRequest(`${REQUESTS_TABLE}?id=eq.${encodeURIComponent(app.request_id)}&requester_user_id=eq.${encodeURIComponent(user.id)}&select=id`, { method: "GET" });
+        if (!ownerRows.length) return res.status(403).json({ ok: false, message: "요청 작성자만 패널티를 줄 수 있습니다." });
+        if (!await isBusinessVisitFlow(user.id, app.applicant_user_id)) {
+          return res.status(403).json({ ok: false, message: "사업자 간 현장 방문 요청에서만 패널티를 줄 수 있습니다." });
+        }
+        if (app.report_status === "penalty_given") return res.status(400).json({ ok: false, message: "이미 이 신청에 패널티가 부여되었습니다." });
+
+        const profile = await getProfile(app.applicant_user_id);
+        if (!profile || profile.member_role !== "provider") return res.status(400).json({ ok: false, message: "청소업체 회원에게만 패널티를 줄 수 있습니다." });
+
+        const nextPenaltyCount = Number(profile.provider_penalty_count || 0) + 1;
+        const suspended = nextPenaltyCount >= 3;
+        await supabaseRequest(`${PROFILES_TABLE}?user_id=eq.${encodeURIComponent(app.applicant_user_id)}&select=${PROFILE_COLUMNS}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            provider_penalty_count: nextPenaltyCount,
+            provider_status: suspended ? "suspended" : profile.provider_status,
+            provider_suspended_at: suspended ? new Date().toISOString() : (profile.provider_suspended_at || null),
+            updated_at: new Date().toISOString(),
+          }),
+        });
+
+        const updated = await supabaseRequest(`${APPLICATIONS_TABLE}?id=eq.${encodeURIComponent(applicationId)}&select=${APPLICATION_COLUMNS}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            report_status: "penalty_given",
+            report_text: clamp(body.reason, 2000) || app.report_text || "",
+            updated_at: new Date().toISOString(),
+          }),
+        });
+        return res.status(200).json({ ok: true, application: updated[0], penalty_count: nextPenaltyCount, suspended });
+      }
+
       if (body.action === "report") {
         const applicationId = cleanId(body.application_id);
         if (!applicationId) return res.status(400).json({ ok: false, message: "신청 ID가 필요합니다." });
 
         const status = String(body.report_status || "").trim();
-        if (!["visited", "quoted", "not_closed"].includes(status)) {
+        if (!["scheduled", "visited", "quoted", "not_closed", "no_show"].includes(status)) {
           return res.status(400).json({ ok: false, message: "보고 상태가 올바르지 않습니다." });
         }
 
@@ -233,9 +302,17 @@ function isApprovedProvider(profile) {
   return !!profile && profile.member_role === "provider" && profile.provider_status === "approved";
 }
 
+async function isBusinessVisitFlow(ownerUserId, applicantUserId) {
+  const [ownerProfile, applicantProfile] = await Promise.all([
+    getProfile(ownerUserId),
+    getProfile(applicantUserId),
+  ]);
+  return isApprovedProvider(ownerProfile) && isApprovedProvider(applicantProfile);
+}
+
 function isMissingProfileRoleColumns(error) {
   const msg = String(error?.message || error || "");
-  return msg.includes("member_role") || msg.includes("provider_status") || msg.includes("schema cache");
+  return msg.includes("member_role") || msg.includes("provider_status") || msg.includes("provider_penalty_count") || msg.includes("provider_suspended_at") || msg.includes("schema cache");
 }
 
 async function attachApplicantDetails(applications) {

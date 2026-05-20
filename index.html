@@ -3029,6 +3029,7 @@
         if (!profile) return "";
         if (profile.member_role === "provider") {
           if (profile.provider_status === "approved") return "\uC2B9\uC778 \uC5C5\uCCB4";
+          if (profile.provider_status === "suspended") return "활동 제한 업체";
           if (profile.provider_status === "rejected") return "\uC5C5\uCCB4 \uC2B9\uC778 \uAC70\uC808";
           return "\uC5C5\uCCB4 \uC2B9\uC778 \uB300\uAE30";
         }
@@ -3352,8 +3353,10 @@
             '<span>' + esc((application.status === "approved" ? "승인됨" : "승인 대기") + " · " + formatDateTime(application.created_at)) + '</span>' +
             '<span>' + esc(applicantStatsText(application.applicant_stats)) + '</span>' +
             '<span>' + esc(application.message || "메시지 없음") + '</span>' +
-            (application.report_status ? '<span>' + esc("보고: " + reportStatusLabel(application.report_status) + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
+            reportSummaryHtml(application) +
             (application.report_text ? '<span>' + esc(application.report_text) + '</span>' : '') +
+            (canConfirmVisit(application) ? '<button class="chip" type="button" data-confirm-visit="' + escAttr(application.id) + '">방문 확인</button>' : '') +
+            (canPenalizeProvider(application) ? '<button class="chip" type="button" data-penalize-provider="' + escAttr(application.id) + '">패널티 1회</button>' : '') +
             (application.status === "approved" ? '' : '<button class="chip" type="button" data-approve-app="' + escAttr(application.id) + '">승인</button>') +
             '</li>';
         }).join("") + '<li class="note-card"><button class="chip" type="button" data-back-my-requests="1">내 요청으로 돌아가기</button></li>';
@@ -3366,6 +3369,42 @@
         fieldRequestList.querySelectorAll("[data-back-my-requests]").forEach(function (button) {
           button.addEventListener("click", loadMyFieldRequests);
         });
+        fieldRequestList.querySelectorAll("[data-confirm-visit]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            confirmFieldVisit(button.getAttribute("data-confirm-visit"), requestId);
+          });
+        });
+        fieldRequestList.querySelectorAll("[data-penalize-provider]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            penalizeProvider(button.getAttribute("data-penalize-provider"), requestId);
+          });
+        });
+      }
+
+      function isBusinessVisitFlow(application) {
+        var ownerProfile = state.profile || {};
+        var applicantProfile = application.applicant_profile || {};
+        return ownerProfile.member_role === "provider" &&
+          applicantProfile.member_role === "provider" &&
+          applicantProfile.provider_status === "approved";
+      }
+
+      function canConfirmVisit(application) {
+        return isBusinessVisitFlow(application) && ["visited", "quoted"].indexOf(application.report_status) >= 0;
+      }
+
+      function canPenalizeProvider(application) {
+        return isBusinessVisitFlow(application) &&
+          application.status === "approved" &&
+          application.report_status !== "confirmed_visit" &&
+          application.report_status !== "penalty_given";
+      }
+
+      function reportSummaryHtml(application) {
+        if (!application.report_status) return "";
+        var amount = application.estimate_amount ? " / " + application.estimate_amount : "";
+        var prefix = isBusinessVisitFlow(application) ? "방문 보고: " : "진행 상황: ";
+        return '<span>' + esc(prefix + reportStatusLabel(application.report_status) + amount) + '</span>';
       }
 
       async function approveFieldApplication(applicationId, requestId) {
@@ -3380,6 +3419,44 @@
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "승인에 실패했습니다.");
           fieldStatus.textContent = "신청자를 승인했습니다. 승인된 신청자는 상세주소를 볼 수 있습니다.";
           loadProfile();
+          loadFieldApplications(requestId);
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      async function confirmFieldVisit(applicationId, requestId) {
+        if (!window.confirm("이 업체가 실제 방문했거나 견적 상담을 진행한 것이 맞나요?")) return;
+        fieldStatus.textContent = "방문 확인을 저장하는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests", {
+            method: "PATCH",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ action: "confirm_visit", application_id: applicationId })
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "방문 확인 저장에 실패했습니다.");
+          fieldStatus.textContent = "방문 확인을 저장했습니다.";
+          loadFieldApplications(requestId);
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      async function penalizeProvider(applicationId, requestId) {
+        var reason = window.prompt("패널티 사유를 입력해주세요. 예: 방문 약속 불이행, 보고 누락, 허위 보고", "");
+        if (reason === null) return;
+        if (!window.confirm("이 업체에 패널티 1회를 부여할까요? 누적 3회가 되면 활동이 제한됩니다.")) return;
+        fieldStatus.textContent = "패널티를 저장하는 중입니다.";
+        try {
+          var response = await fetch("/api/field-requests", {
+            method: "PATCH",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ action: "penalize_provider", application_id: applicationId, reason: reason })
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "패널티 저장에 실패했습니다.");
+          fieldStatus.textContent = data.suspended ? "패널티가 저장되었습니다. 누적 3회로 업체 활동이 제한되었습니다." : "패널티가 저장되었습니다. 누적 " + data.penalty_count + "회입니다.";
           loadFieldApplications(requestId);
         } catch (error) {
           fieldStatus.textContent = error.message;
@@ -3477,7 +3554,7 @@
       }
 
       async function submitFieldReport(applicationId) {
-        var reportStatus = window.prompt("보고 상태를 입력하세요: 견적 제출, 방문 완료, 미성사", "견적 제출");
+        var reportStatus = window.prompt("보고 상태를 입력하세요: 방문 예정, 방문 완료, 견적 제출, 미방문, 미성사", "방문 예정");
         if (reportStatus === null) return;
         var estimateAmount = window.prompt("견적 금액 또는 조건을 입력하세요.", "");
         if (estimateAmount === null) return;
@@ -3533,7 +3610,8 @@
         }
         adminProvidersList.innerHTML = providers.map(function (profile) {
           var title = profile.company_name || profile.display_name || profile.email || "\uC5C5\uCCB4\uBA85 \uBBF8\uC785\uB825";
-          var meta = [profile.email, profile.phone, profile.service_area, memberRoleText(profile)].filter(Boolean).join(" | ");
+          var penaltyText = profile.provider_penalty_count ? "패널티 " + Number(profile.provider_penalty_count || 0) + "회" : "";
+          var meta = [profile.email, profile.phone, profile.service_area, memberRoleText(profile), penaltyText].filter(Boolean).join(" | ");
           return '<li class="note-card"><strong>' + esc(title) + '</strong><span>' + esc(meta) + '</span>' + (profile.bio ? '<span>' + esc(profile.bio) + '</span>' : '') + '<div class="button-row"><button class="chip" type="button" data-provider-approve="' + escAttr(profile.user_id) + '">\uC2B9\uC778</button><button class="chip" type="button" data-provider-reject="' + escAttr(profile.user_id) + '">\uAC70\uC808</button></div></li>';
         }).join("");
         adminProvidersList.querySelectorAll("[data-provider-approve]").forEach(function (button) {
@@ -4110,15 +4188,21 @@
 
       function normalizeReportStatus(value) {
         var text = String(value || "").trim();
+        if (text === "방문 예정") return "scheduled";
         if (text === "방문 완료") return "visited";
+        if (text === "미방문") return "no_show";
         if (text === "미성사") return "not_closed";
         return "quoted";
       }
 
       function reportStatusLabel(value) {
+        if (value === "scheduled") return "방문 예정";
         if (value === "visited") return "방문 완료";
         if (value === "quoted") return "견적 제출";
+        if (value === "no_show") return "미방문";
         if (value === "not_closed") return "미성사";
+        if (value === "confirmed_visit") return "요청자 방문 확인";
+        if (value === "penalty_given") return "패널티 부여";
         return value || "-";
       }
 

@@ -3,7 +3,7 @@ const APPLICATIONS_TABLE = "field_request_applications";
 const REQUESTS_TABLE = "field_requests";
 
 const BASE_PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,bio,created_at,updated_at";
-const PROFILE_COLUMNS = `${BASE_PROFILE_COLUMNS},member_role,provider_status,provider_requested_at,provider_approved_at`;
+const PROFILE_COLUMNS = `${BASE_PROFILE_COLUMNS},member_role,provider_status,provider_requested_at,provider_approved_at,provider_penalty_count,provider_suspended_at`;
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -39,10 +39,11 @@ module.exports = async (req, res) => {
         const userId = cleanUuid(body.user_id);
         const status = normalizeProviderStatus(body.provider_status);
         if (!userId) return res.status(400).json({ ok: false, message: "\uD68C\uC6D0 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." });
-        if (!["approved", "rejected", "pending"].includes(status)) return res.status(400).json({ ok: false, message: "\uC2B9\uC778 \uC0C1\uD0DC\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4." });
+        if (!["approved", "rejected", "pending", "suspended"].includes(status)) return res.status(400).json({ ok: false, message: "\uC2B9\uC778 \uC0C1\uD0DC\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4." });
         const row = {
           provider_status: status,
           provider_approved_at: status === "approved" ? new Date().toISOString() : null,
+          provider_suspended_at: status === "suspended" ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
         };
         const updated = await supabaseRequest(PROFILES_TABLE + "?user_id=eq." + encodeURIComponent(userId) + "&select=" + PROFILE_COLUMNS, {
@@ -118,6 +119,8 @@ async function getProfile(user) {
     provider_status: "none",
     provider_requested_at: null,
     provider_approved_at: null,
+    provider_penalty_count: 0,
+    provider_suspended_at: null,
   };
 }
 
@@ -137,7 +140,7 @@ function isAdminUser(user) {
 
 function normalizeProviderStatus(value) {
   const status = String(value || "pending").trim();
-  return ["none", "pending", "approved", "rejected"].includes(status) ? status : "pending";
+  return ["none", "pending", "approved", "rejected", "suspended"].includes(status) ? status : "pending";
 }
 
 function cleanUuid(value) {
@@ -161,6 +164,7 @@ function normalizeMemberRole(value) {
 function nextProviderStatus(current, role) {
   if (role !== "provider") return "none";
   if (current && current.provider_status === "approved") return "approved";
+  if (current && current.provider_status === "suspended") return "suspended";
   return "pending";
 }
 
@@ -171,6 +175,8 @@ function normalizeProfileDefaults(profile) {
     provider_status: profile.provider_status || (profile.member_role === "provider" ? "pending" : "none"),
     provider_requested_at: profile.provider_requested_at || null,
     provider_approved_at: profile.provider_approved_at || null,
+    provider_penalty_count: Number(profile.provider_penalty_count || 0),
+    provider_suspended_at: profile.provider_suspended_at || null,
   };
 }
 
@@ -197,6 +203,8 @@ async function upsertProfile(row) {
     delete fallback.provider_status;
     delete fallback.provider_requested_at;
     delete fallback.provider_approved_at;
+    delete fallback.provider_penalty_count;
+    delete fallback.provider_suspended_at;
     return await supabaseRequest(PROFILES_TABLE + "?on_conflict=user_id&select=" + BASE_PROFILE_COLUMNS, {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
@@ -207,7 +215,7 @@ async function upsertProfile(row) {
 
 function isMissingProfileRoleColumns(error) {
   const msg = String(error?.message || error || "");
-  return msg.includes("member_role") || msg.includes("provider_status") || msg.includes("provider_requested_at") || msg.includes("provider_approved_at") || msg.includes("schema cache");
+  return msg.includes("member_role") || msg.includes("provider_status") || msg.includes("provider_requested_at") || msg.includes("provider_approved_at") || msg.includes("provider_penalty_count") || msg.includes("provider_suspended_at") || msg.includes("schema cache");
 }
 
 function getAvatarUrl(user) {
