@@ -809,6 +809,13 @@
       font-size: 15px !important;
     }
 
+    #requestMessageBody,
+    #boardCommentBody {
+      min-height: 120px !important;
+      width: 100% !important;
+      line-height: 1.6;
+    }
+
     button {
       min-height: 44px;
       border-radius: 12px;
@@ -3587,6 +3594,7 @@
         fieldRequestList.innerHTML = applications.map(function (application) {
           return '<li class="note-card">' +
             '<strong>' + esc(application.status === "approved" ? "승인됨" : "승인 대기") + '</strong>' +
+            appliedRequestSummaryHtml(application.request_summary) +
             '<span>' + esc(application.message || "메시지 없음") + '</span>' +
             (application.report_status ? '<span>' + esc("보고: " + reportStatusLabel(application.report_status) + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
             (application.status === "approved" ? '<button class="chip" type="button" data-app-detail="' + escAttr(application.request_id) + '">상세주소 보기</button><button class="chip" type="button" data-submit-report="' + escAttr(application.id) + '">방문/견적 보고</button><button class="chip" type="button" data-request-messages="' + escAttr(application.id) + '">쪽지</button>' : '') +
@@ -3608,6 +3616,19 @@
             loadRequestMessages(button.getAttribute("data-request-messages"));
           });
         });
+      }
+
+      function appliedRequestSummaryHtml(summary) {
+        if (!summary) return '<span>요청 정보를 불러오지 못했습니다.</span>';
+        var title = [summary.public_area, summary.cleaning_type].filter(Boolean).join(" · ");
+        var details = [
+          summary.space_type,
+          summary.area_pyeong ? String(summary.area_pyeong) + "평" : "",
+          summary.preferred_date ? "희망일: " + summary.preferred_date : "",
+          summary.status ? "상태: " + summary.status : "",
+          formatDateTime(summary.created_at)
+        ].filter(Boolean).join(" | ");
+        return '<strong>' + esc(title || "현장요청") + '</strong>' + (details ? '<span>' + esc(details) + '</span>' : '');
       }
 
       async function loadRequestMessages(applicationId) {

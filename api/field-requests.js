@@ -322,6 +322,7 @@ async function attachApplicantDetails(applications) {
   const authUsers = new Map(authPairs);
   const stats = await getApplicantStats(uniqueIds);
   const profiles = await getProfiles(uniqueIds);
+  const requestSummaries = await getRequestSummaries(applications.map((app) => app.request_id).filter(Boolean));
   return applications.map((app) => ({
     ...app,
     applicant_email: authUsers.get(app.applicant_user_id)?.email || "",
@@ -334,7 +335,19 @@ async function attachApplicantDetails(applications) {
       quoted_count: 0,
       not_closed_count: 0,
     },
+    request_summary: requestSummaries.get(app.request_id) || null,
   }));
+}
+
+async function getRequestSummaries(requestIds) {
+  const summaries = new Map();
+  const uniqueIds = [...new Set(requestIds)];
+  if (!uniqueIds.length) return summaries;
+
+  const filter = uniqueIds.map((id) => encodeURIComponent(id)).join(",");
+  const rows = await supabaseRequest(`${REQUESTS_TABLE}?id=in.(${filter})&select=id,public_area,cleaning_type,space_type,area_pyeong,preferred_date,status,created_at`, { method: "GET" });
+  for (const row of rows) summaries.set(row.id, row);
+  return summaries;
 }
 
 async function getApplicantStats(userIds) {
