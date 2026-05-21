@@ -2,9 +2,11 @@ const crypto = require("crypto");
 
 const POSTS_TABLE = "board_posts";
 const COMMENTS_TABLE = "board_comments";
+const REPORTS_TABLE = "board_reports";
 const PROFILES_TABLE = "user_profiles";
 const POST_COLUMNS = "id,author_user_id,title,body,category,view_count,is_pinned,status,created_at,updated_at";
 const COMMENT_COLUMNS = "id,post_id,author_user_id,body,status,created_at,updated_at";
+const REPORT_COLUMNS = "id,target_type,post_id,comment_id,reporter_user_id,reason,status,created_at,updated_at";
 const PROFILE_COLUMNS = "user_id,email,display_name,company_name";
 
 module.exports = async (req, res) => {
@@ -56,6 +58,35 @@ module.exports = async (req, res) => {
 
     if (req.method === "POST") {
       const body = await readJson(req);
+
+      if (body.action === "report") {
+        const targetType = normalizeReportTarget(body.target_type);
+        const postId = cleanId(body.post_id);
+        const commentId = cleanId(body.comment_id);
+        const reason = clamp(body.reason, 1000);
+        if (!targetType || !postId) return res.status(400).json({ ok: false, message: "신고 대상이 필요합니다." });
+        if (!reason) return res.status(400).json({ ok: false, message: "신고 사유를 입력해주세요." });
+
+        const posts = await supabaseRequest(`${POSTS_TABLE}?id=eq.${encodeURIComponent(postId)}&status=eq.active&select=id&limit=1`, { method: "GET" });
+        if (!posts.length) return res.status(404).json({ ok: false, message: "글을 찾을 수 없습니다." });
+        if (targetType === "comment") {
+          if (!commentId) return res.status(400).json({ ok: false, message: "댓글 ID가 필요합니다." });
+          const comments = await supabaseRequest(`${COMMENTS_TABLE}?id=eq.${encodeURIComponent(commentId)}&post_id=eq.${encodeURIComponent(postId)}&status=eq.active&select=id&limit=1`, { method: "GET" });
+          if (!comments.length) return res.status(404).json({ ok: false, message: "댓글을 찾을 수 없습니다." });
+        }
+
+        const row = {
+          id: makeId(12),
+          target_type: targetType,
+          post_id: postId,
+          comment_id: targetType === "comment" ? commentId : null,
+          reporter_user_id: user.id,
+          reason,
+          status: "open",
+        };
+        const created = await supabaseRequest(`${REPORTS_TABLE}?select=${REPORT_COLUMNS}`, { method: "POST", body: JSON.stringify(row) });
+        return res.status(201).json({ ok: true, report: created[0] });
+      }
 
       if (body.action === "comment") {
         const postId = cleanId(body.post_id);
@@ -118,6 +149,22 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true, comment: updated[0] });
       }
 
+      if (body.action === "hide_comment") {
+        if (!viewerIsAdmin) return res.status(403).json({ ok: false, message: "관리자만 댓글을 숨길 수 있습니다." });
+        const commentId = cleanId(body.comment_id);
+        if (!commentId) return res.status(400).json({ ok: false, message: "댓글 ID가 필요합니다." });
+
+        const comments = await supabaseRequest(COMMENTS_TABLE + "?id=eq." + encodeURIComponent(commentId) + "&status=eq.active&select=" + COMMENT_COLUMNS + "&limit=1", { method: "GET" });
+        if (!comments.length) return res.status(404).json({ ok: false, message: "댓글을 찾을 수 없습니다." });
+
+        const updated = await supabaseRequest(COMMENTS_TABLE + "?id=eq." + encodeURIComponent(commentId) + "&select=" + COMMENT_COLUMNS, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "hidden", updated_at: new Date().toISOString() }),
+        });
+        await closeReports({ targetType: "comment", commentId });
+        return res.status(200).json({ ok: true, comment: updated[0] });
+      }
+
       const postId = cleanId(body.post_id);
       if (!postId) return res.status(400).json({ ok: false, message: "\uAE00 ID\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4." });
 
@@ -134,6 +181,26 @@ module.exports = async (req, res) => {
           body: JSON.stringify({ status: "deleted", updated_at: new Date().toISOString() }),
         });
         return res.status(200).json({ ok: true, post: updated[0] });
+      }
+
+      if (body.action === "hide") {
+        if (!viewerIsAdmin) return res.status(403).json({ ok: false, message: "관리자만 글을 숨길 수 있습니다." });
+        const updated = await supabaseRequest(POSTS_TABLE + "?id=eq." + encodeURIComponent(postId) + "&select=" + POST_COLUMNS, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "hidden", updated_at: new Date().toISOString() }),
+        });
+        await closeReports({ targetType: "post", postId });
+        return res.status(200).json({ ok: true, post: updated[0] });
+      }
+
+      if (body.action === "pin" || body.action === "unpin") {
+        if (!viewerIsAdmin) return res.status(403).json({ ok: false, message: "관리자만 공지를 고정할 수 있습니다." });
+        const updated = await supabaseRequest(POSTS_TABLE + "?id=eq." + encodeURIComponent(postId) + "&select=" + POST_COLUMNS, {
+          method: "PATCH",
+          body: JSON.stringify({ is_pinned: body.action === "pin", updated_at: new Date().toISOString() }),
+        });
+        const enriched = await attachAuthors(updated);
+        return res.status(200).json({ ok: true, post: enriched[0] });
       }
 
       if (!isOwner) return res.status(403).json({ ok: false, message: "\uC791\uC131\uC790\uB9CC \uC218\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4." });
@@ -316,6 +383,30 @@ function cleanId(value) {
 function normalizeCategory(value) {
   const category = String(value || "").trim();
   return ["notice", "free", "question", "review"].includes(category) ? category : "";
+}
+
+function normalizeReportTarget(value) {
+  const target = String(value || "").trim();
+  return ["post", "comment"].includes(target) ? target : "";
+}
+
+async function closeReports({ targetType, postId, commentId }) {
+  try {
+    const filters = [
+      `target_type=eq.${encodeURIComponent(targetType)}`,
+      postId ? `post_id=eq.${encodeURIComponent(postId)}` : "",
+      commentId ? `comment_id=eq.${encodeURIComponent(commentId)}` : "",
+      "status=eq.open",
+      `select=${REPORT_COLUMNS}`,
+    ].filter(Boolean).join("&");
+    await supabaseRequest(`${REPORTS_TABLE}?${filters}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "resolved", updated_at: new Date().toISOString() }),
+    });
+  } catch (error) {
+    const msg = String(error?.message || error || "");
+    if (!msg.includes("does not exist") && !msg.includes("schema cache")) throw error;
+  }
 }
 
 function clamp(value, max) {
