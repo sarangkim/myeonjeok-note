@@ -1432,6 +1432,7 @@
             </select>
             <input id="boardSearch" placeholder="검색어">
             <button class="secondary" id="boardSearchBtn" type="button">검색</button>
+            <button class="secondary" id="boardModerationBtn" type="button" hidden>신고/숨김</button>
           </div>
           <div class="field-form" id="boardCreateBlock">
             <select id="boardWriteCategory" aria-label="글 카테고리">
@@ -1453,6 +1454,7 @@
           <div class="button-row">
             <button class="secondary" id="loadPendingProvidersBtn" type="button">&#49849;&#51064; &#45824;&#44592;</button>
             <button class="secondary" id="loadApprovedProvidersBtn" type="button">&#49849;&#51064;&#46108; &#50629;&#52404;</button>
+            <button class="secondary" id="loadSuspendedProvidersBtn" type="button">활동 제한</button>
           </div>
           <div class="note" id="adminProvidersStatus"></div>
           <ul class="note-list" id="adminProvidersList"></ul>
@@ -1602,6 +1604,7 @@
       var boardCategoryFilter = document.getElementById("boardCategoryFilter");
       var boardSearchInput = document.getElementById("boardSearch");
       var boardSearchBtn = document.getElementById("boardSearchBtn");
+      var boardModerationBtn = document.getElementById("boardModerationBtn");
       var boardWriteCategoryInput = document.getElementById("boardWriteCategory");
       var boardTitleInput = document.getElementById("boardTitle");
       var boardBodyInput = document.getElementById("boardBody");
@@ -1714,8 +1717,10 @@
         state.boardCategory = boardCategoryFilter.value;
         loadBoardPosts();
       });
+      boardModerationBtn.addEventListener("click", loadBoardModeration);
       loadPendingProvidersBtn.addEventListener("click", function () { loadProviderApprovals("pending"); });
       loadApprovedProvidersBtn.addEventListener("click", function () { loadProviderApprovals("approved"); });
+      loadSuspendedProvidersBtn.addEventListener("click", function () { loadProviderApprovals("suspended"); });
       document.querySelectorAll("[data-policy]").forEach(function (button) {
         button.addEventListener("click", function () { openPolicy(button.getAttribute("data-policy")); });
       });
@@ -2763,6 +2768,7 @@
       function updateAdminMenu() {
         if (!adminProvidersMenu) return;
         adminProvidersMenu.hidden = !state.isAdmin;
+        if (boardModerationBtn) boardModerationBtn.hidden = !state.isAdmin;
         if (!state.isAdmin && !adminProvidersPanel.hidden) selectSideView("notes");
       }
 
@@ -3710,7 +3716,7 @@
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "\uC5C5\uCCB4 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
           renderProviderApprovals(data.providers || []);
-          adminProvidersStatus.textContent = status === "approved" ? "\uC2B9\uC778\uB41C \uC5C5\uCCB4 \uBAA9\uB85D\uC785\uB2C8\uB2E4." : "\uC2B9\uC778 \uB300\uAE30 \uC5C5\uCCB4 \uBAA9\uB85D\uC785\uB2C8\uB2E4.";
+          adminProvidersStatus.textContent = status === "approved" ? "\uC2B9\uC778\uB41C \uC5C5\uCCB4 \uBAA9\uB85D\uC785\uB2C8\uB2E4." : (status === "suspended" ? "활동 제한 업체 목록입니다." : "\uC2B9\uC778 \uB300\uAE30 \uC5C5\uCCB4 \uBAA9\uB85D\uC785\uB2C8\uB2E4.");
         } catch (error) {
           adminProvidersStatus.textContent = error.message;
         }
@@ -3793,6 +3799,44 @@
           boardStatus.textContent = error.message;
         }
       }
+
+      async function loadBoardModeration() {
+        if (!state.isAdmin) {
+          boardStatus.textContent = "관리자만 볼 수 있습니다.";
+          return;
+        }
+        boardStatus.textContent = "신고/숨김 목록을 불러오는 중입니다.";
+        try {
+          var response = await fetch("/api/board?moderation=1", { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "신고/숨김 목록을 불러오지 못했습니다.");
+          renderBoardModeration(data);
+          boardStatus.textContent = "신고/숨김 목록을 불러왔습니다.";
+        } catch (error) {
+          boardStatus.textContent = error.message;
+        }
+      }
+
+      function renderBoardModeration(data) {
+        var reports = data.reports || [];
+        var hiddenPosts = data.hidden_posts || [];
+        var hiddenComments = data.hidden_comments || [];
+        var reportHtml = reports.length ? reports.map(function (report) {
+          return '<li class="note-card"><strong>' + esc("신고: " + (report.target_type === "comment" ? "댓글" : "게시글")) + '</strong><span>' + esc(report.reason || "") + '</span><span>' + esc(formatDateTime(report.created_at)) + '</span>' + (report.post_id ? '<button class="chip" type="button" data-open-board-post="' + escAttr(report.post_id) + '">글 열기</button>' : '') + '</li>';
+        }).join("") : '<li class="note-card"><span>접수된 신고가 없습니다.</span></li>';
+        var hiddenPostHtml = hiddenPosts.length ? hiddenPosts.map(function (post) {
+          return '<li class="note-card"><strong>' + esc(post.title || "제목 없음") + '</strong>' + boardAuthorHtml(post) + '<span>' + esc([boardCategoryLabel(post.category), formatDateTime(post.updated_at)].filter(Boolean).join(" | ")) + '</span></li>';
+        }).join("") : '<li class="note-card"><span>숨김 처리된 게시글이 없습니다.</span></li>';
+        var hiddenCommentHtml = hiddenComments.length ? hiddenComments.map(function (comment) {
+          return '<li class="note-card"><strong>숨김 댓글</strong>' + boardAuthorHtml(comment) + '<span>' + esc(comment.body || "") + '</span><span>' + esc(formatDateTime(comment.updated_at)) + '</span></li>';
+        }).join("") : '<li class="note-card"><span>숨김 처리된 댓글이 없습니다.</span></li>';
+        boardList.innerHTML = '<li class="note-card"><button class="chip" type="button" data-board-back="1">게시판으로 돌아가기</button><strong>신고/숨김 관리</strong><span>신고된 항목과 숨김 처리된 글/댓글을 확인합니다.</span></li><li class="note-card"><strong>접수된 신고</strong></li>' + reportHtml + '<li class="note-card"><strong>숨김 게시글</strong></li>' + hiddenPostHtml + '<li class="note-card"><strong>숨김 댓글</strong></li>' + hiddenCommentHtml;
+        boardList.querySelectorAll("[data-board-back]").forEach(function (button) { button.addEventListener("click", loadBoardPosts); });
+        boardList.querySelectorAll("[data-open-board-post]").forEach(function (button) {
+          button.addEventListener("click", function () { loadBoardPostDetail(button.getAttribute("data-open-board-post")); });
+        });
+      }
+
       function renderBoardPosts() {
         state.boardCurrentPost = null;
         var posts = state.boardPosts || [];
@@ -3808,8 +3852,8 @@
         var pagePosts = posts.slice(start, start + pageSize);
         boardList.innerHTML = pagePosts.map(function (post, index) {
           var number = total - start - index;
-          var meta = ["#" + number, boardCategoryLabel(post.category), post.author_name || "\uC775\uBA85 \uC0AC\uC6A9\uC790", formatDateTime(post.updated_at || post.created_at), "조회 " + Number(post.view_count || 0), "\uB313\uAE00 " + Number(post.comment_count || 0)].filter(Boolean).join(" | ");
-          return '<li class="note-card"><button class="chip" type="button" data-open-board-post="' + escAttr(post.id) + '">\uC5F4\uAE30</button><strong>' + esc(number + '. ' + (post.title || "\uC81C\uBAA9 \uC5C6\uC74C")) + '</strong><span>' + esc(meta) + '</span><span>' + esc(shortText(post.body, 90)) + '</span></li>';
+          var meta = ["#" + number, boardCategoryLabel(post.category), formatDateTime(post.updated_at || post.created_at), "조회 " + Number(post.view_count || 0), "\uB313\uAE00 " + Number(post.comment_count || 0)].filter(Boolean).join(" | ");
+          return '<li class="note-card"><button class="chip" type="button" data-open-board-post="' + escAttr(post.id) + '">\uC5F4\uAE30</button><strong>' + esc((post.is_pinned ? "[고정] " : "") + number + '. ' + (post.title || "\uC81C\uBAA9 \uC5C6\uC74C")) + '</strong>' + boardAuthorHtml(post) + '<span>' + esc(meta) + '</span><span>' + esc(shortText(post.body, 90)) + '</span></li>';
         }).join("") + renderBoardPager(totalPages);
         boardList.querySelectorAll("[data-open-board-post]").forEach(function (button) {
           button.addEventListener("click", function () { loadBoardPostDetail(button.getAttribute("data-open-board-post")); });
@@ -3838,6 +3882,26 @@
         return "자유";
       }
 
+      function boardAuthorHtml(item) {
+        var role = boardAuthorRoleLabel(item);
+        var bits = [item.author_company_name, item.author_service_area, role].filter(Boolean).join(" · ");
+        return '<div class="profile-head">' +
+          renderAvatar(item.author_avatar_url, item.author_name || item.author_email || "작성자") +
+          '<div><strong>' + esc(item.author_name || item.author_email || "익명 사용자") + '</strong>' +
+          (bits ? '<span>' + esc(bits) + '</span>' : '') +
+          '</div></div>';
+      }
+
+      function boardAuthorRoleLabel(item) {
+        if (item.author_member_role === "provider") {
+          if (item.author_provider_status === "approved") return "승인업체";
+          if (item.author_provider_status === "suspended") return "활동 제한 업체";
+          if (item.author_provider_status === "rejected") return "업체 승인 거절";
+          return "업체 승인 대기";
+        }
+        return "일반회원";
+      }
+
       async function loadBoardPostDetail(postId) {
         if (!state.authSession) {
           boardStatus.textContent = "게시글 보기는 로그인이 필요합니다.";
@@ -3864,6 +3928,27 @@
           return '<li class="note-card"><strong>' + esc(meta) + '</strong><span>' + esc(comment.body || "") + '</span><button class="chip" type="button" data-board-report-comment="' + escAttr(comment.id) + '">신고</button>' + (viewerIsAdmin ? '<button class="chip" type="button" data-board-comment-hide="' + escAttr(comment.id) + '">숨김</button>' : '') + (canDeleteComment ? '<button class="chip" type="button" data-board-comment-delete="' + escAttr(comment.id) + '">\uC0AD\uC81C</button>' : '') + '</li>';
         }).join("") : '<li class="note-card"><span>\uC544\uC9C1 \uB313\uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</span></li>';
         boardList.innerHTML = '<li class="note-card"><button class="chip" type="button" data-board-back="1">\uBAA9\uB85D</button>' + (viewerIsAdmin ? '<button class="chip" type="button" data-board-pin="' + escAttr(post.id) + '">' + esc(post.is_pinned ? "고정 해제" : "공지 고정") + '</button><button class="chip" type="button" data-board-hide="' + escAttr(post.id) + '">숨김</button>' : '') + '<button class="chip" type="button" data-board-report-post="' + escAttr(post.id) + '">신고</button>' + (mine ? '<button class="chip" type="button" data-board-edit="' + escAttr(post.id) + '">\uC218\uC815</button>' : '') + (canModeratePost ? '<button class="chip" type="button" data-board-delete="' + escAttr(post.id) + '">\uC0AD\uC81C</button>' : '') + '<strong>' + esc((post.is_pinned ? "[고정] " : "") + (post.title || "\uC81C\uBAA9 \uC5C6\uC74C")) + '</strong><span>' + esc([boardCategoryLabel(post.category), post.author_name || "\uC775\uBA85 \uC0AC\uC6A9\uC790", formatDateTime(post.created_at), "조회 " + Number(post.view_count || 0)].filter(Boolean).join(" | ")) + '</span><span>' + esc(post.body || "") + '</span></li><li class="note-card"><strong>\uB313\uAE00</strong><textarea id="boardCommentBody" placeholder="\uB313\uAE00\uC744 \uC785\uB825\uD558\uC138\uC694"></textarea><button class="chip" type="button" data-board-comment="' + escAttr(post.id) + '">\uB313\uAE00 \uB4F1\uB85D</button></li>' + commentHtml;
+        boardList.querySelectorAll("[data-board-back]").forEach(function (button) { button.addEventListener("click", loadBoardPosts); });
+        boardList.querySelectorAll("[data-board-comment]").forEach(function (button) { button.addEventListener("click", function () { createBoardComment(button.getAttribute("data-board-comment")); }); });
+        boardList.querySelectorAll("[data-board-edit]").forEach(function (button) { button.addEventListener("click", function () { editBoardPost(button.getAttribute("data-board-edit")); }); });
+        boardList.querySelectorAll("[data-board-delete]").forEach(function (button) { button.addEventListener("click", function () { deleteBoardPost(button.getAttribute("data-board-delete")); }); });
+        boardList.querySelectorAll("[data-board-comment-delete]").forEach(function (button) { button.addEventListener("click", function () { deleteBoardComment(button.getAttribute("data-board-comment-delete"), post.id); }); });
+        boardList.querySelectorAll("[data-board-pin]").forEach(function (button) { button.addEventListener("click", function () { toggleBoardPin(button.getAttribute("data-board-pin"), !!post.is_pinned); }); });
+        boardList.querySelectorAll("[data-board-hide]").forEach(function (button) { button.addEventListener("click", function () { hideBoardPost(button.getAttribute("data-board-hide")); }); });
+        boardList.querySelectorAll("[data-board-comment-hide]").forEach(function (button) { button.addEventListener("click", function () { hideBoardComment(button.getAttribute("data-board-comment-hide"), post.id); }); });
+        boardList.querySelectorAll("[data-board-report-post]").forEach(function (button) { button.addEventListener("click", function () { reportBoardTarget("post", button.getAttribute("data-board-report-post"), ""); }); });
+        boardList.querySelectorAll("[data-board-report-comment]").forEach(function (button) { button.addEventListener("click", function () { reportBoardTarget("comment", post.id, button.getAttribute("data-board-report-comment")); }); });
+      }
+
+      function renderBoardPostDetail(post, comments, viewerUserId, viewerIsAdmin) {
+        var mine = post.author_user_id && post.author_user_id === viewerUserId;
+        var canModeratePost = mine || viewerIsAdmin;
+        var commentHtml = comments.length ? comments.map(function (comment, index) {
+          var canDeleteComment = viewerIsAdmin || (comment.author_user_id && comment.author_user_id === viewerUserId);
+          var meta = ["댓글 " + (index + 1), formatDateTime(comment.created_at)].filter(Boolean).join(" | ");
+          return '<li class="note-card"><strong>' + esc(meta) + '</strong>' + boardAuthorHtml(comment) + '<span>' + esc(comment.body || "") + '</span><button class="chip" type="button" data-board-report-comment="' + escAttr(comment.id) + '">신고</button>' + (viewerIsAdmin ? '<button class="chip" type="button" data-board-comment-hide="' + escAttr(comment.id) + '">숨김</button>' : '') + (canDeleteComment ? '<button class="chip" type="button" data-board-comment-delete="' + escAttr(comment.id) + '">삭제</button>' : '') + '</li>';
+        }).join("") : '<li class="note-card"><span>아직 댓글이 없습니다.</span></li>';
+        boardList.innerHTML = '<li class="note-card"><button class="chip" type="button" data-board-back="1">목록</button>' + (viewerIsAdmin ? '<button class="chip" type="button" data-board-pin="' + escAttr(post.id) + '">' + esc(post.is_pinned ? "고정 해제" : "공지 고정") + '</button><button class="chip" type="button" data-board-hide="' + escAttr(post.id) + '">숨김</button>' : '') + '<button class="chip" type="button" data-board-report-post="' + escAttr(post.id) + '">신고</button>' + (mine ? '<button class="chip" type="button" data-board-edit="' + escAttr(post.id) + '">수정</button>' : '') + (canModeratePost ? '<button class="chip" type="button" data-board-delete="' + escAttr(post.id) + '">삭제</button>' : '') + '<strong>' + esc((post.is_pinned ? "[고정] " : "") + (post.title || "제목 없음")) + '</strong>' + boardAuthorHtml(post) + '<span>' + esc([boardCategoryLabel(post.category), formatDateTime(post.created_at), "조회 " + Number(post.view_count || 0)].filter(Boolean).join(" | ")) + '</span><span>' + esc(post.body || "") + '</span></li><li class="note-card"><strong>댓글</strong><textarea id="boardCommentBody" placeholder="댓글을 입력하세요"></textarea><button class="chip" type="button" data-board-comment="' + escAttr(post.id) + '">댓글 등록</button></li>' + commentHtml;
         boardList.querySelectorAll("[data-board-back]").forEach(function (button) { button.addEventListener("click", loadBoardPosts); });
         boardList.querySelectorAll("[data-board-comment]").forEach(function (button) { button.addEventListener("click", function () { createBoardComment(button.getAttribute("data-board-comment")); }); });
         boardList.querySelectorAll("[data-board-edit]").forEach(function (button) { button.addEventListener("click", function () { editBoardPost(button.getAttribute("data-board-edit")); }); });
