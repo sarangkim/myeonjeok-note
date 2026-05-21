@@ -1399,6 +1399,30 @@
                   <option value="many">많음</option>
                 </select>
               </label>
+              <label>
+                벽걸이 에어컨
+                <input id="estimateAirconWall" inputmode="numeric" value="0">
+              </label>
+              <label>
+                스탠드 에어컨
+                <input id="estimateAirconStand" inputmode="numeric" value="0">
+              </label>
+              <label>
+                2in1 에어컨
+                <input id="estimateAirconTwoInOne" inputmode="numeric" value="0">
+              </label>
+              <label>
+                시스템 1way
+                <input id="estimateAirconSystemOne" inputmode="numeric" value="0">
+              </label>
+              <label>
+                시스템 2way
+                <input id="estimateAirconSystemTwo" inputmode="numeric" value="0">
+              </label>
+              <label>
+                시스템 4way
+                <input id="estimateAirconSystemFour" inputmode="numeric" value="0">
+              </label>
             </div>
             <label class="check-row">
               <input id="estimateWindow" type="checkbox">
@@ -1558,6 +1582,12 @@
       var estimateHouseholdsInput = document.getElementById("estimateHouseholds");
       var estimateDirtInput = document.getElementById("estimateDirt");
       var estimateFurnitureInput = document.getElementById("estimateFurniture");
+      var estimateAirconWallInput = document.getElementById("estimateAirconWall");
+      var estimateAirconStandInput = document.getElementById("estimateAirconStand");
+      var estimateAirconTwoInOneInput = document.getElementById("estimateAirconTwoInOne");
+      var estimateAirconSystemOneInput = document.getElementById("estimateAirconSystemOne");
+      var estimateAirconSystemTwoInput = document.getElementById("estimateAirconSystemTwo");
+      var estimateAirconSystemFourInput = document.getElementById("estimateAirconSystemFour");
       var estimateWindowInput = document.getElementById("estimateWindow");
       var estimateFloorCareInput = document.getElementById("estimateFloorCare");
       var estimateWasteInput = document.getElementById("estimateWaste");
@@ -2869,8 +2899,14 @@
         var rooms = Math.max(0, Math.round(toNumber(estimateRoomsInput.value) || 0));
         var floors = Math.max(1, Math.round(toNumber(estimateFloorsInput.value) || 1));
         var households = Math.max(0, Math.round(toNumber(estimateHouseholdsInput.value) || 0));
-        var dirt = ({ low: 0.92, normal: 1, high: 1.18, severe: 1.38 })[estimateDirtInput.value] || 1;
-        var furniture = ({ empty: 1, some: 1.08, many: 1.2 })[estimateFurnitureInput.value] || 1;
+        var dirt = ({ low: 0.95, normal: 1, high: 1.12, severe: 1.25 })[estimateDirtInput.value] || 1;
+        var furniture = ({ empty: 1, some: 1.05, many: 1.12 })[estimateFurnitureInput.value] || 1;
+        var airconWall = Math.max(0, Math.round(toNumber(estimateAirconWallInput.value) || 0));
+        var airconStand = Math.max(0, Math.round(toNumber(estimateAirconStandInput.value) || 0));
+        var airconTwoInOne = Math.max(0, Math.round(toNumber(estimateAirconTwoInOneInput.value) || 0));
+        var airconSystemOne = Math.max(0, Math.round(toNumber(estimateAirconSystemOneInput.value) || 0));
+        var airconSystemTwo = Math.max(0, Math.round(toNumber(estimateAirconSystemTwoInput.value) || 0));
+        var airconSystemFour = Math.max(0, Math.round(toNumber(estimateAirconSystemFourInput.value) || 0));
         var extraNotes = estimateNotesInput.value.trim();
         var optionTotal = 0;
         var lines = [];
@@ -2883,49 +2919,82 @@
 
         if (type === "office_regular") {
           price = regularOfficeMonthly(area, weeklyVisits);
-          optionTotal += bathrooms * 8000 + rooms * 4000;
-          lines.push("30\uD3C9 \uC774\uD558 \uC8FC 1\uD68C \uC6D4 20\uB9CC\uC6D0\uB300, 31~50\uD3C9 \uC8FC 1\uD68C \uC6D4 30\uB9CC\uC6D0\uB300 \uAE30\uC900\uC73C\uB85C \uC6D4 \uACC4\uC57D\uAC00\uB97C \uACC4\uC0B0\uD588\uC2B5\uB2C8\uB2E4.");
-          lines.push("\uC8FC \uBC29\uBB38 " + weeklyVisits + "\uD68C(\uC6D4 \uC57D " + monthlyVisits + "\uD68C) \uBC18\uC601");
+          optionTotal += bathrooms * 6000 + rooms * 3000;
+          lines.push("월 정기청소는 면적이 커질수록 평당 단가를 낮추고, 방문 횟수는 상주 인건비를 넘지 않도록 완만하게 반영했습니다.");
+          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회) 반영");
         } else if (type === "hospital_regular") {
-          price = regularOfficeMonthly(area, weeklyVisits) * 1.22;
-          optionTotal += bathrooms * 12000 + rooms * 8000;
-          lines.push("병원은 일반 사무실 정기청소에 위생·소독 관리 부담을 35% 가산했습니다.");
-          lines.push("\uC8FC \uBC29\uBB38 " + weeklyVisits + "\uD68C(\uC6D4 \uC57D " + monthlyVisits + "\uD68C) \uBC18\uC601");
+          price = regularOfficeMonthly(area, weeklyVisits) * 1.14;
+          optionTotal += bathrooms * 9000 + rooms * 5000;
+          lines.push("병원은 일반 사무실보다 위생 관리 부담을 조금 더 반영했습니다.");
+          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회) 반영");
         } else if (type === "academy_regular") {
-          price = regularOfficeMonthly(area, weeklyVisits) * 1.12;
-          optionTotal += bathrooms * 9000 + rooms * 6000;
-          lines.push("학원은 일반 사무실 정기청소에 책상·강의실 반복 사용 부담을 18% 가산했습니다.");
-          lines.push("\uC8FC \uBC29\uBB38 " + weeklyVisits + "\uD68C(\uC6D4 \uC57D " + monthlyVisits + "\uD68C) \uBC18\uC601");
+          price = regularOfficeMonthly(area, weeklyVisits) * 1.08;
+          optionTotal += bathrooms * 7000 + rooms * 4000;
+          lines.push("학원은 교실·책상 반복 사용 부담을 사무실보다 약간 높게 반영했습니다.");
+          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회) 반영");
         } else if (type === "office_movein") {
-          price = Math.max(250000, area * 18000);
-          optionTotal += bathrooms * 18000 + rooms * 7000;
-          lines.push("사업장 청소 공개 단가 평당 15,000~30,000원 범위의 중간값에 가깝게 잡았습니다.");
+          price = tieredAreaCost(area, [
+            { upTo: 30, price: 14000 },
+            { upTo: 70, price: 10500 },
+            { upTo: 200, price: 7600 },
+            { upTo: Infinity, price: 5400 }
+          ], 220000);
+          optionTotal += bathrooms * 12000 + rooms * 5000;
+          lines.push("대형 면적은 구간별 단가를 낮춰 사무실 입주청소 1회 견적을 계산했습니다.");
         } else if (type === "post_construction") {
-          price = Math.max(350000, area * 20000);
-          optionTotal += rooms * 8000;
-          if (!estimateWasteInput.checked) optionTotal += area * 1500;
-          lines.push("준공·건축 청소 공개 단가 평당 15,000~25,000원 범위를 기준으로 잡았습니다.");
+          price = tieredAreaCost(area, [
+            { upTo: 30, price: 17000 },
+            { upTo: 70, price: 13000 },
+            { upTo: 200, price: 9500 },
+            { upTo: Infinity, price: 6800 }
+          ], 330000);
+          optionTotal += rooms * 6000;
+          if (!estimateWasteInput.checked) optionTotal += area * 900;
+          lines.push("준공청소는 분진·잔재물 부담을 반영하되, 대형 현장은 평당 단가를 낮췄습니다.");
         } else if (type === "deep_clean") {
-          price = Math.max(220000, area * 13000);
-          optionTotal += bathrooms * 20000 + rooms * 8000;
+          price = tieredAreaCost(area, [
+            { upTo: 30, price: 11500 },
+            { upTo: 70, price: 8500 },
+            { upTo: 200, price: 6200 },
+            { upTo: Infinity, price: 4700 }
+          ], 200000);
+          optionTotal += bathrooms * 14000 + rooms * 6000;
           lines.push("대청소는 입주청소보다 낮고 일반 유지청소보다 높은 1회성 단가로 계산했습니다.");
         } else if (type === "apartment_movein") {
-          price = Math.max(150000, area * 14000);
-          optionTotal += bathrooms * 22000;
-          lines.push("아파트 입주청소 공개 단가 평당 10,000~15,500원과 20~30평대 가격표를 기준으로 계산했습니다.");
+          price = tieredAreaCost(area, [
+            { upTo: 30, price: 12500 },
+            { upTo: 40, price: 11000 },
+            { upTo: 100, price: 9000 },
+            { upTo: Infinity, price: 8000 }
+          ], 180000);
+          optionTotal += bathrooms * 15000;
+          lines.push("아파트 입주청소는 평당 1만~1.5만원대 시세를 기준으로, 넓은 평수는 단가를 낮췄습니다.");
         } else if (type === "villa_stairs") {
-          price = Math.max(35000, floors * 10000 + households * 1000) * Math.max(1, weeklyVisits);
+          price = Math.max(35000, floors * 8000 + households * 700) * Math.max(1, weeklyVisits);
           optionTotal += estimateWasteInput.checked ? 25000 : 0;
-          lines.push("빌라 계단청소 공개 사례인 4~5층 월 1회 35,000원, 5층 월 4회 6~7만원을 기준으로 계산했습니다.");
-          lines.push("\uC8FC \uBC29\uBB38 " + weeklyVisits + "\uD68C(\uC6D4 \uC57D " + monthlyVisits + "\uD68C) \uBC18\uC601");
+          lines.push("빌라 계단청소는 층수와 세대수를 반영한 월 관리형 견적으로 계산했습니다.");
+          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회) 반영");
         }
 
-        if (estimateWindowInput.checked) optionTotal += Math.max(30000, area * 1200);
-        if (estimateFloorCareInput.checked) optionTotal += Math.max(50000, area * 3500);
-        if (estimateWasteInput.checked && type !== "villa_stairs") optionTotal += Math.max(30000, area * 2000);
+        if (estimateWindowInput.checked) optionTotal += Math.max(30000, area * 900);
+        if (estimateFloorCareInput.checked) optionTotal += Math.max(50000, area * 2500);
+        if (estimateWasteInput.checked && type !== "villa_stairs") optionTotal += Math.max(30000, area * 1200);
+
+        var airconEstimate = airconCleaningCost({
+          wall: airconWall,
+          stand: airconStand,
+          twoInOne: airconTwoInOne,
+          systemOne: airconSystemOne,
+          systemTwo: airconSystemTwo,
+          systemFour: airconSystemFour
+        });
+        if (airconEstimate.total > 0) {
+          optionTotal += airconEstimate.total;
+          lines.push("에어컨 청소: " + airconEstimate.summary + " 반영");
+        }
 
         price = (price + optionTotal) * dirt * furniture;
-        if (estimateOffhourInput.checked) price *= 1.15;
+        if (estimateOffhourInput.checked) price *= 1.1;
 
         var low = roundToThousand(price * 0.9);
         var high = roundToThousand(price * 1.15);
@@ -2937,17 +3006,63 @@
       }
 
       function regularOfficeMonthly(area, weeklyVisits) {
-        var base;
-        if (area <= 30) base = 220000;
-        else if (area <= 50) base = 300000;
-        else if (area <= 100) base = 300000 + (area - 50) * 5000;
-        else base = 550000 + (area - 100) * 3500;
+        var base = regularMonthlyBase(area);
+        return base * regularVisitFactor(weeklyVisits);
+      }
 
-        var visits = Math.max(1, weeklyVisits);
-        var visitFactor = 1;
-        if (visits <= 3) visitFactor = 1 + (visits - 1) * 0.58;
-        else visitFactor = 2.16 + (visits - 3) * 0.42;
-        return base * visitFactor;
+      function regularMonthlyBase(area) {
+        if (area <= 30) return 210000;
+        if (area <= 50) return 300000;
+        if (area <= 100) return 420000;
+        if (area <= 200) return 620000;
+        if (area <= 300) return 780000;
+        return 780000 + Math.min(400000, (area - 300) * 800);
+      }
+
+      function regularVisitFactor(weeklyVisits) {
+        var visits = Math.max(1, Math.round(weeklyVisits || 1));
+        if (visits === 1) return 1;
+        if (visits === 2) return 1.35;
+        if (visits === 3) return 1.65;
+        if (visits === 4) return 1.9;
+        if (visits === 5) return 2.15;
+        return Math.min(2.75, 2.35 + (visits - 6) * 0.12);
+      }
+
+      function tieredAreaCost(area, tiers, minimum) {
+        var remaining = Math.max(0, Number(area || 0));
+        var total = 0;
+        for (var i = 0; i < tiers.length && remaining > 0; i += 1) {
+          var tier = tiers[i];
+          var size = tier.upTo === Infinity ? remaining : Math.min(remaining, tier.upTo);
+          total += size * tier.price;
+          remaining -= size;
+        }
+        return Math.max(minimum, total);
+      }
+
+      function airconCleaningCost(counts) {
+        var items = [
+          { count: counts.wall, label: "벽걸이", price: 70000 },
+          { count: counts.stand, label: "스탠드", price: 130000 },
+          { count: counts.twoInOne, label: "2in1", price: 190000 },
+          { count: counts.systemOne, label: "시스템 1way", price: 110000 },
+          { count: counts.systemTwo, label: "시스템 2way", price: 130000 },
+          { count: counts.systemFour, label: "시스템 4way", price: 160000 }
+        ];
+        var total = 0;
+        var unitCount = 0;
+        var summary = [];
+        items.forEach(function (item) {
+          if (!item.count) return;
+          total += item.count * item.price;
+          unitCount += item.label === "2in1" ? item.count * 2 : item.count;
+          summary.push(item.label + " " + item.count + "대");
+        });
+        if (!unitCount) return { total: 0, summary: "" };
+        var discount = unitCount >= 10 ? 0.85 : unitCount >= 5 ? 0.9 : 1;
+        if (discount < 1) summary.push("다량 " + Math.round((1 - discount) * 100) + "% 할인");
+        return { total: Math.round(total * discount), summary: summary.join(", ") };
       }
 
       function formatWonRange(low, high) {
