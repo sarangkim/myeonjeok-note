@@ -21,6 +21,18 @@ create table if not exists public.board_comments (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.board_reports (
+  id text primary key,
+  target_type text not null,
+  post_id text not null references public.board_posts(id) on delete cascade,
+  comment_id text references public.board_comments(id) on delete cascade,
+  reporter_user_id uuid not null,
+  reason text not null default '',
+  status text not null default 'open',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.board_posts add column if not exists category text not null default 'free';
 alter table public.board_posts add column if not exists view_count integer not null default 0;
 alter table public.board_posts add column if not exists is_pinned boolean not null default false;
@@ -31,9 +43,13 @@ create index if not exists board_posts_pinned_updated_idx on public.board_posts 
 create index if not exists board_posts_author_idx on public.board_posts (author_user_id, updated_at desc);
 create index if not exists board_comments_post_created_idx on public.board_comments (post_id, created_at asc);
 create index if not exists board_comments_author_idx on public.board_comments (author_user_id, updated_at desc);
+create index if not exists board_reports_status_created_idx on public.board_reports (status, created_at desc);
+create index if not exists board_reports_post_idx on public.board_reports (post_id, status);
+create index if not exists board_reports_comment_idx on public.board_reports (comment_id, status);
 
 alter table public.board_posts enable row level security;
 alter table public.board_comments enable row level security;
+alter table public.board_reports enable row level security;
 
 alter table public.board_posts drop constraint if exists board_posts_category_check;
 alter table public.board_posts add constraint board_posts_category_check
@@ -42,3 +58,11 @@ alter table public.board_posts add constraint board_posts_category_check
 alter table public.board_posts drop constraint if exists board_posts_view_count_check;
 alter table public.board_posts add constraint board_posts_view_count_check
   check (view_count >= 0);
+
+alter table public.board_reports drop constraint if exists board_reports_target_type_check;
+alter table public.board_reports add constraint board_reports_target_type_check
+  check (target_type in ('post', 'comment'));
+
+alter table public.board_reports drop constraint if exists board_reports_status_check;
+alter table public.board_reports add constraint board_reports_status_check
+  check (status in ('open', 'resolved', 'dismissed'));
