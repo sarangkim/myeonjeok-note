@@ -1355,6 +1355,7 @@
                 <option value="academy_regular">학원 정기청소</option>
                 <option value="apartment_movein">아파트 입주청소</option>
                 <option value="villa_stairs">빌라 계단청소</option>
+                <option value="aircon_clean">에어컨 청소</option>
               </select>
             </label>
             <div class="estimate-grid">
@@ -1399,27 +1400,27 @@
                   <option value="many">많음</option>
                 </select>
               </label>
-              <label>
+              <label class="aircon-estimate-field">
                 벽걸이 에어컨
                 <input id="estimateAirconWall" inputmode="numeric" value="0">
               </label>
-              <label>
+              <label class="aircon-estimate-field">
                 스탠드 에어컨
                 <input id="estimateAirconStand" inputmode="numeric" value="0">
               </label>
-              <label>
+              <label class="aircon-estimate-field">
                 2in1 에어컨
                 <input id="estimateAirconTwoInOne" inputmode="numeric" value="0">
               </label>
-              <label>
+              <label class="aircon-estimate-field">
                 시스템 1way
                 <input id="estimateAirconSystemOne" inputmode="numeric" value="0">
               </label>
-              <label>
+              <label class="aircon-estimate-field">
                 시스템 2way
                 <input id="estimateAirconSystemTwo" inputmode="numeric" value="0">
               </label>
-              <label>
+              <label class="aircon-estimate-field">
                 시스템 4way
                 <input id="estimateAirconSystemFour" inputmode="numeric" value="0">
               </label>
@@ -1710,7 +1711,11 @@
         if (!protectNoteInput.checked) notePasswordInput.value = "";
       });
       calculateEstimateBtn.addEventListener("click", renderEstimate);
-      estimateTypeInput.addEventListener("change", renderEstimate);
+      estimateTypeInput.addEventListener("change", function () {
+        updateEstimateForm();
+        renderEstimate();
+      });
+      updateEstimateForm();
       loginBtn.addEventListener("click", requestLoginLink);
       googleLoginBtn.addEventListener("click", loginWithGoogle);
       logoutBtn.addEventListener("click", logout);
@@ -2890,6 +2895,21 @@
         ].join("");
       }
 
+      function updateEstimateForm() {
+        var isAircon = estimateTypeInput.value === "aircon_clean";
+        Array.prototype.forEach.call(document.querySelectorAll(".aircon-estimate-field"), function (field) {
+          field.hidden = !isAircon;
+        });
+        [estimateAreaInput, estimateVisitsInput, estimateBathroomsInput, estimateRoomsInput, estimateFloorsInput, estimateHouseholdsInput, estimateDirtInput, estimateFurnitureInput].forEach(function (input) {
+          if (!input || !input.closest) return;
+          input.closest("label").hidden = isAircon;
+        });
+        [estimateWindowInput, estimateFloorCareInput, estimateWasteInput].forEach(function (input) {
+          if (!input || !input.closest) return;
+          input.closest("label").hidden = isAircon;
+        });
+      }
+
       function calculateEstimate() {
         var type = estimateTypeInput.value;
         var area = toNumber(estimateAreaInput.value || estimateAreaFromResult(state.currentResult));
@@ -2912,6 +2932,31 @@
         var lines = [];
         var label = estimateTypeInput.options[estimateTypeInput.selectedIndex].text;
         var price = 0;
+
+        if (type === "aircon_clean") {
+          var standaloneAircon = airconCleaningCost({
+            wall: airconWall,
+            stand: airconStand,
+            twoInOne: airconTwoInOne,
+            systemOne: airconSystemOne,
+            systemTwo: airconSystemTwo,
+            systemFour: airconSystemFour
+          });
+          if (standaloneAircon.total <= 0) {
+            return { ok: false, message: "청소할 에어컨 종류별 대수를 입력해주세요." };
+          }
+          lines.push("에어컨은 정기청소에 포함하지 않는 별도 1회 청소 견적입니다.");
+          lines.push("연 1회 또는 냉방 시즌 전후 관리 기준으로 계산했습니다.");
+          lines.push("에어컨 청소: " + standaloneAircon.summary + " 반영");
+          if (extraNotes) lines.push("추가사항: " + extraNotes);
+          return {
+            ok: true,
+            label: label,
+            low: roundToThousand(standaloneAircon.total * 0.9),
+            high: roundToThousand(standaloneAircon.total * 1.15),
+            lines: lines
+          };
+        }
 
         if (!area && type !== "villa_stairs") {
           return { ok: false, message: "면적을 조회하거나 평수를 직접 입력해주세요." };
@@ -2979,19 +3024,6 @@
         if (estimateWindowInput.checked) optionTotal += Math.max(30000, area * 900);
         if (estimateFloorCareInput.checked) optionTotal += Math.max(50000, area * 2500);
         if (estimateWasteInput.checked && type !== "villa_stairs") optionTotal += Math.max(30000, area * 1200);
-
-        var airconEstimate = airconCleaningCost({
-          wall: airconWall,
-          stand: airconStand,
-          twoInOne: airconTwoInOne,
-          systemOne: airconSystemOne,
-          systemTwo: airconSystemTwo,
-          systemFour: airconSystemFour
-        });
-        if (airconEstimate.total > 0) {
-          optionTotal += airconEstimate.total;
-          lines.push("에어컨 청소: " + airconEstimate.summary + " 반영");
-        }
 
         price = (price + optionTotal) * dirt * furniture;
         if (estimateOffhourInput.checked) price *= 1.1;
