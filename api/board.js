@@ -7,7 +7,7 @@ const PROFILES_TABLE = "user_profiles";
 const POST_COLUMNS = "id,author_user_id,title,body,category,view_count,is_pinned,status,created_at,updated_at";
 const COMMENT_COLUMNS = "id,post_id,author_user_id,body,status,created_at,updated_at";
 const REPORT_COLUMNS = "id,target_type,post_id,comment_id,reporter_user_id,reason,status,created_at,updated_at";
-const PROFILE_COLUMNS = "user_id,email,display_name,company_name";
+const PROFILE_COLUMNS = "user_id,email,display_name,company_name,service_area,member_role,provider_status";
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -23,6 +23,14 @@ module.exports = async (req, res) => {
     const viewerIsAdmin = isBoardAdmin(user);
 
     if (req.method === "GET") {
+      if (String(req.query.moderation || "") === "1") {
+        if (!viewerIsAdmin) return res.status(403).json({ ok: false, message: "관리자만 볼 수 있습니다." });
+        const reports = await supabaseRequest(`${REPORTS_TABLE}?status=eq.open&select=${REPORT_COLUMNS}&order=created_at.desc&limit=100`, { method: "GET" });
+        const hiddenPosts = await attachAuthors(await supabaseRequest(`${POSTS_TABLE}?status=eq.hidden&select=${POST_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" }));
+        const hiddenComments = await attachAuthors(await supabaseRequest(`${COMMENTS_TABLE}?status=eq.hidden&select=${COMMENT_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" }));
+        return res.status(200).json({ ok: true, reports, hidden_posts: hiddenPosts, hidden_comments: hiddenComments });
+      }
+
       if (String(req.query.detail || "") === "1") {
         const postId = cleanId(req.query.post_id);
         if (!postId) return res.status(400).json({ ok: false, message: "글 ID가 필요합니다." });
@@ -315,6 +323,11 @@ async function attachAuthors(rows) {
       ...row,
       author_name: profile.display_name || profile.company_name || auth.email || "익명 사용자",
       author_email: auth.email || profile.email || "",
+      author_avatar_url: auth.avatar_url || "",
+      author_company_name: profile.company_name || "",
+      author_service_area: profile.service_area || "",
+      author_member_role: profile.member_role || "customer",
+      author_provider_status: profile.provider_status || (profile.member_role === "provider" ? "pending" : "none"),
     };
   });
 }
@@ -341,9 +354,10 @@ async function getAuthUserSummary(userId) {
       Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
     },
   });
-  if (!response.ok) return { email: "" };
+  if (!response.ok) return { email: "", avatar_url: "" };
   const user = await response.json();
-  return { email: user?.email || "" };
+  const metadata = user?.user_metadata || {};
+  return { email: user?.email || "", avatar_url: metadata.avatar_url || metadata.picture || "" };
 }
 
 function readJson(req) {
