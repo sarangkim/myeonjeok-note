@@ -26,6 +26,10 @@
       box-sizing: border-box;
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     body {
       margin: 0;
       background: var(--bg);
@@ -70,6 +74,82 @@
       color: var(--muted);
       font-size: 14px;
     }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.22) 34%, transparent 35%),
+        repeating-linear-gradient(90deg, rgba(30, 111, 92, 0.045) 0 1px, transparent 1px 84px),
+        repeating-linear-gradient(0deg, rgba(30, 111, 92, 0.035) 0 1px, transparent 1px 84px);
+      animation: backgroundDrift 18s ease-in-out infinite alternate;
+    }
+
+    .app { animation: pageEnter 680ms ease both; }
+
+    .topbar,
+    .search-panel,
+    .note-panel,
+    .panel,
+    .result-section { animation: panelEnter 620ms ease both; }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 54px;
+      height: 54px;
+      border: 1px solid rgba(18, 77, 64, 0.16);
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.92), rgba(238,247,242,0.62));
+      box-shadow: 0 16px 30px rgba(18, 77, 64, 0.12), inset 0 1px 0 rgba(255,255,255,0.96);
+      overflow: hidden;
+    }
+
+    .brand-logo::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border-radius: 13px;
+      background: linear-gradient(135deg, #1e6f5c 0%, #2b9578 54%, #f2c46b 55%, #f2c46b 100%);
+      transform: rotate(-8deg);
+    }
+
+    .brand-logo-mark {
+      position: relative;
+      z-index: 1;
+      color: #fff;
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1;
+      text-transform: lowercase;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.16);
+    }
+
+    .brand-logo-spark {
+      position: absolute;
+      right: 9px;
+      top: 9px;
+      z-index: 2;
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: #f2c46b;
+      box-shadow: 0 0 0 4px rgba(242, 196, 107, 0.22);
+      animation: sparkPulse 2.4s ease-in-out infinite;
+    }
+
+    .brand-copy { display: grid; gap: 2px; }
+
 
     .main-nav {
       position: relative;
@@ -733,6 +813,35 @@
       }
     }
 
+
+    @keyframes pageEnter {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes panelEnter {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes backgroundDrift {
+      from { background-position: 0 0, 0 0, 0 0; }
+      to { background-position: 80px 0, 42px 0, 0 42px; }
+    }
+
+    @keyframes sparkPulse {
+      0%, 100% { transform: scale(1); opacity: 0.78; }
+      50% { transform: scale(1.35); opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
     body {
       min-height: 100vh;
       background:
@@ -1232,8 +1341,14 @@
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <h1>견적노트</h1>
-        <span>주소를 입력하면 평수를 알고 청소견적을 알아볼 수 있습니다.</span>
+        <div class="brand-logo" aria-hidden="true">
+          <span class="brand-logo-mark">h</span>
+          <span class="brand-logo-spark"></span>
+        </div>
+        <div class="brand-copy">
+          <h1>견적노트</h1>
+          <span>주소를 입력하면 평수를 알고 청소견적을 알아볼 수 있습니다.</span>
+        </div>
       </div>
       <nav class="main-nav" aria-label="&#51452;&#50836; &#47700;&#45684;">
         <button class="menu-button secondary" id="mainMenuButton" type="button" aria-label="&#47700;&#45684; &#50676;&#44592;" aria-expanded="false">&#9776;</button>
@@ -1398,6 +1513,21 @@
                   <option value="empty">비어 있음</option>
                   <option value="some">일부 있음</option>
                   <option value="many">많음</option>
+                </select>
+              </label>
+              <label class="employee-estimate-field">
+                근무 인원수
+                <input id="estimateEmployees" inputmode="numeric" value="0" placeholder="예: 25">
+              </label>
+              <label class="floor-estimate-field">
+                바닥재
+                <select id="estimateFloorMaterial">
+                  <option value="standard">일반 데코타일/PVC</option>
+                  <option value="porcelain">포세린·폴리싱 타일</option>
+                  <option value="carpet">카펫</option>
+                  <option value="concrete">에폭시·콘크리트</option>
+                  <option value="wood">마루·장판</option>
+                  <option value="stone">대리석·천연석</option>
                 </select>
               </label>
               <label class="aircon-estimate-field">
@@ -1583,6 +1713,8 @@
       var estimateHouseholdsInput = document.getElementById("estimateHouseholds");
       var estimateDirtInput = document.getElementById("estimateDirt");
       var estimateFurnitureInput = document.getElementById("estimateFurniture");
+      var estimateEmployeesInput = document.getElementById("estimateEmployees");
+      var estimateFloorMaterialInput = document.getElementById("estimateFloorMaterial");
       var estimateAirconWallInput = document.getElementById("estimateAirconWall");
       var estimateAirconStandInput = document.getElementById("estimateAirconStand");
       var estimateAirconTwoInOneInput = document.getElementById("estimateAirconTwoInOne");
@@ -2896,18 +3028,36 @@
       }
 
       function updateEstimateForm() {
-        var isAircon = estimateTypeInput.value === "aircon_clean";
-        Array.prototype.forEach.call(document.querySelectorAll(".aircon-estimate-field"), function (field) {
-          field.hidden = !isAircon;
+        var type = estimateTypeInput.value;
+        var isAircon = type === "aircon_clean";
+        var isVilla = type === "villa_stairs";
+        var isRegularCommercial = ["office_regular", "hospital_regular", "academy_regular"].indexOf(type) !== -1;
+        toggleEstimateFields(".aircon-estimate-field", isAircon);
+        toggleEstimateFields(".employee-estimate-field", isRegularCommercial);
+        toggleEstimateFields(".floor-estimate-field", isRegularCommercial);
+        setEstimateLabelHidden(estimateAreaInput, isAircon || isVilla);
+        setEstimateLabelHidden(estimateVisitsInput, isAircon);
+        setEstimateLabelHidden(estimateBathroomsInput, isAircon || isVilla);
+        setEstimateLabelHidden(estimateRoomsInput, isAircon || isVilla);
+        setEstimateLabelHidden(estimateFloorsInput, !isVilla);
+        setEstimateLabelHidden(estimateHouseholdsInput, !isVilla);
+        setEstimateLabelHidden(estimateDirtInput, isAircon);
+        setEstimateLabelHidden(estimateFurnitureInput, isAircon || isVilla);
+        [estimateWindowInput, estimateFloorCareInput].forEach(function (input) {
+          setEstimateLabelHidden(input, isAircon || isVilla);
         });
-        [estimateAreaInput, estimateVisitsInput, estimateBathroomsInput, estimateRoomsInput, estimateFloorsInput, estimateHouseholdsInput, estimateDirtInput, estimateFurnitureInput].forEach(function (input) {
-          if (!input || !input.closest) return;
-          input.closest("label").hidden = isAircon;
+        setEstimateLabelHidden(estimateWasteInput, isAircon);
+      }
+
+      function toggleEstimateFields(selector, visible) {
+        Array.prototype.forEach.call(document.querySelectorAll(selector), function (field) {
+          field.hidden = !visible;
         });
-        [estimateWindowInput, estimateFloorCareInput, estimateWasteInput].forEach(function (input) {
-          if (!input || !input.closest) return;
-          input.closest("label").hidden = isAircon;
-        });
+      }
+
+      function setEstimateLabelHidden(input, hidden) {
+        if (!input || !input.closest) return;
+        input.closest("label").hidden = hidden;
       }
 
       function calculateEstimate() {
@@ -2921,6 +3071,9 @@
         var households = Math.max(0, Math.round(toNumber(estimateHouseholdsInput.value) || 0));
         var dirt = ({ low: 0.95, normal: 1, high: 1.12, severe: 1.25 })[estimateDirtInput.value] || 1;
         var furniture = ({ empty: 1, some: 1.05, many: 1.12 })[estimateFurnitureInput.value] || 1;
+        var employees = Math.max(0, Math.round(toNumber(estimateEmployeesInput.value) || 0));
+        var floorMaterial = estimateFloorMaterialInput.value || "standard";
+        var floor = floorMaterialInfo(floorMaterial);
         var airconWall = Math.max(0, Math.round(toNumber(estimateAirconWallInput.value) || 0));
         var airconStand = Math.max(0, Math.round(toNumber(estimateAirconStandInput.value) || 0));
         var airconTwoInOne = Math.max(0, Math.round(toNumber(estimateAirconTwoInOneInput.value) || 0));
@@ -2963,20 +3116,20 @@
         }
 
         if (type === "office_regular") {
-          price = regularOfficeMonthly(area, weeklyVisits);
-          optionTotal += bathrooms * 6000 + rooms * 3000;
+          price = regularOfficeMonthly(area, weeklyVisits) * floor.factor;
+          optionTotal += bathrooms * 6000 + rooms * 3000 + regularEmployeeLoad(employees, weeklyVisits);
           lines.push("월 정기청소는 면적이 커질수록 평당 단가를 낮추고, 방문 횟수는 상주 인건비를 넘지 않도록 완만하게 반영했습니다.");
-          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회) 반영");
+          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회), 근무 인원 " + employees + "명, 바닥재 " + floor.label + " 반영");
         } else if (type === "hospital_regular") {
-          price = regularOfficeMonthly(area, weeklyVisits) * 1.14;
-          optionTotal += bathrooms * 9000 + rooms * 5000;
+          price = regularOfficeMonthly(area, weeklyVisits) * 1.14 * floor.factor;
+          optionTotal += bathrooms * 9000 + rooms * 5000 + regularEmployeeLoad(employees, weeklyVisits);
           lines.push("병원은 일반 사무실보다 위생 관리 부담을 조금 더 반영했습니다.");
-          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회) 반영");
+          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회), 근무 인원 " + employees + "명, 바닥재 " + floor.label + " 반영");
         } else if (type === "academy_regular") {
-          price = regularOfficeMonthly(area, weeklyVisits) * 1.08;
-          optionTotal += bathrooms * 7000 + rooms * 4000;
+          price = regularOfficeMonthly(area, weeklyVisits) * 1.08 * floor.factor;
+          optionTotal += bathrooms * 7000 + rooms * 4000 + regularEmployeeLoad(employees, weeklyVisits);
           lines.push("학원은 교실·책상 반복 사용 부담을 사무실보다 약간 높게 반영했습니다.");
-          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회) 반영");
+          lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회), 근무 인원 " + employees + "명, 바닥재 " + floor.label + " 반영");
         } else if (type === "office_movein") {
           price = tieredAreaCost(area, [
             { upTo: 30, price: 14000 },
@@ -3015,9 +3168,9 @@
           optionTotal += bathrooms * 15000;
           lines.push("아파트 입주청소는 평당 1만~1.5만원대 시세를 기준으로, 넓은 평수는 단가를 낮췄습니다.");
         } else if (type === "villa_stairs") {
-          price = Math.max(35000, floors * 8000 + households * 700) * Math.max(1, weeklyVisits);
+          price = villaStairMonthly(floors, households, weeklyVisits);
           optionTotal += estimateWasteInput.checked ? 25000 : 0;
-          lines.push("빌라 계단청소는 층수와 세대수를 반영한 월 관리형 견적으로 계산했습니다.");
+          lines.push("빌라 계단청소는 4층 8세대 주 1회 기준 월 6만~9만원대를 기준으로 계산했습니다.");
           lines.push("주 방문 " + weeklyVisits + "회(월 약 " + monthlyVisits + "회) 반영");
         }
 
@@ -3032,9 +3185,39 @@
         var high = roundToThousand(price * 1.15);
         lines.unshift(type === "villa_stairs" ? "예상 월 견적입니다." : "예상 1회 견적입니다.");
         if (type.indexOf("regular") !== -1) lines[0] = "예상 월 견적입니다.";
-        lines.push("오염도 " + estimateDirtInput.options[estimateDirtInput.selectedIndex].text + ", 집기 " + estimateFurnitureInput.options[estimateFurnitureInput.selectedIndex].text + " 반영");
+        if (type === "villa_stairs") {
+          lines.push("오염도 " + estimateDirtInput.options[estimateDirtInput.selectedIndex].text + " 반영");
+        } else {
+          lines.push("오염도 " + estimateDirtInput.options[estimateDirtInput.selectedIndex].text + ", 집기 " + estimateFurnitureInput.options[estimateFurnitureInput.selectedIndex].text + " 반영");
+        }
         if (extraNotes) lines.push("\uCD94\uAC00\uC0AC\uD56D: " + extraNotes);
         return { ok: true, label: label, low: low, high: high, lines: lines };
+      }
+
+      function floorMaterialInfo(value) {
+        var map = {
+          standard: { label: "일반 데코타일/PVC", factor: 1 },
+          porcelain: { label: "포세린·폴리싱 타일", factor: 1.08 },
+          carpet: { label: "카펫", factor: 1.12 },
+          concrete: { label: "에폭시·콘크리트", factor: 1.06 },
+          wood: { label: "마루·장판", factor: 1.04 },
+          stone: { label: "대리석·천연석", factor: 1.16 }
+        };
+        return map[value] || map.standard;
+      }
+
+      function regularEmployeeLoad(employees, weeklyVisits) {
+        var count = Math.max(0, Number(employees || 0));
+        if (!count) return 0;
+        var base = count <= 10 ? count * 1200 : 12000 + (count - 10) * 1800;
+        return base * Math.max(1, Math.min(2.2, regularVisitFactor(weeklyVisits) * 0.72));
+      }
+
+      function villaStairMonthly(floors, households, weeklyVisits) {
+        var base = Math.max(65000, floors * 12000 + households * 2500);
+        var visits = Math.max(1, Math.round(weeklyVisits || 1));
+        var factor = visits === 1 ? 1 : visits === 2 ? 1.85 : visits === 3 ? 2.55 : visits === 4 ? 3.15 : 3.15 + (visits - 4) * 0.45;
+        return base * factor;
       }
 
       function regularOfficeMonthly(area, weeklyVisits) {
