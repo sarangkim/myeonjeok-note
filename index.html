@@ -1422,7 +1422,24 @@
 
         <div class="side-panel" id="boardPanel" hidden>
           <h2>자유게시판</h2>
+          <div class="button-row">
+            <select id="boardCategoryFilter" aria-label="게시판 카테고리">
+              <option value="">전체</option>
+              <option value="notice">공지</option>
+              <option value="free">자유</option>
+              <option value="question">질문</option>
+              <option value="review">후기</option>
+            </select>
+            <input id="boardSearch" placeholder="검색어">
+            <button class="secondary" id="boardSearchBtn" type="button">검색</button>
+          </div>
           <div class="field-form" id="boardCreateBlock">
+            <select id="boardWriteCategory" aria-label="글 카테고리">
+              <option value="free">자유</option>
+              <option value="question">질문</option>
+              <option value="review">후기</option>
+              <option value="notice">공지</option>
+            </select>
             <input id="boardTitle" placeholder="제목">
             <textarea id="boardBody" placeholder="내용을 입력하세요. 로그인한 사람만 볼 수 있습니다."></textarea>
             <button id="createBoardPostBtn" type="button">글 등록</button>
@@ -1582,6 +1599,10 @@
       var requestsPanelTitle = document.getElementById("requestsPanelTitle");
       var fieldCreateBlock = document.getElementById("fieldCreateBlock");
       var boardPanel = document.getElementById("boardPanel");
+      var boardCategoryFilter = document.getElementById("boardCategoryFilter");
+      var boardSearchInput = document.getElementById("boardSearch");
+      var boardSearchBtn = document.getElementById("boardSearchBtn");
+      var boardWriteCategoryInput = document.getElementById("boardWriteCategory");
       var boardTitleInput = document.getElementById("boardTitle");
       var boardBodyInput = document.getElementById("boardBody");
       var createBoardPostBtn = document.getElementById("createBoardPostBtn");
@@ -1608,6 +1629,8 @@
         revealObserver: null,
         boardCurrentPost: null,
         boardPosts: [],
+        boardCategory: "",
+        boardSearch: "",
         boardPage: 1,
         boardPageSize: 10
       };
@@ -1674,6 +1697,23 @@
       loadMyFieldRequestsBtn.addEventListener("click", loadMyFieldRequests);
       loadAppliedFieldRequestsBtn.addEventListener("click", loadAppliedFieldRequests);
       createBoardPostBtn.addEventListener("click", createBoardPost);
+      boardSearchBtn.addEventListener("click", function () {
+        state.boardSearch = boardSearchInput.value.trim();
+        state.boardCategory = boardCategoryFilter.value;
+        loadBoardPosts();
+      });
+      boardSearchInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          state.boardSearch = boardSearchInput.value.trim();
+          state.boardCategory = boardCategoryFilter.value;
+          loadBoardPosts();
+        }
+      });
+      boardCategoryFilter.addEventListener("change", function () {
+        state.boardCategory = boardCategoryFilter.value;
+        loadBoardPosts();
+      });
       loadPendingProvidersBtn.addEventListener("click", function () { loadProviderApprovals("pending"); });
       loadApprovedProvidersBtn.addEventListener("click", function () { loadProviderApprovals("approved"); });
       document.querySelectorAll("[data-policy]").forEach(function (button) {
@@ -3357,6 +3397,7 @@
             (application.report_text ? '<span>' + esc(application.report_text) + '</span>' : '') +
             (canConfirmVisit(application) ? '<button class="chip" type="button" data-confirm-visit="' + escAttr(application.id) + '">방문 확인</button>' : '') +
             (canPenalizeProvider(application) ? '<button class="chip" type="button" data-penalize-provider="' + escAttr(application.id) + '">패널티 1회</button>' : '') +
+            (application.status === "approved" ? '<button class="chip" type="button" data-request-messages="' + escAttr(application.id) + '">쪽지</button>' : '') +
             (application.status === "approved" ? '' : '<button class="chip" type="button" data-approve-app="' + escAttr(application.id) + '">승인</button>') +
             '</li>';
         }).join("") + '<li class="note-card"><button class="chip" type="button" data-back-my-requests="1">내 요청으로 돌아가기</button></li>';
@@ -3377,6 +3418,11 @@
         fieldRequestList.querySelectorAll("[data-penalize-provider]").forEach(function (button) {
           button.addEventListener("click", function () {
             penalizeProvider(button.getAttribute("data-penalize-provider"), requestId);
+          });
+        });
+        fieldRequestList.querySelectorAll("[data-request-messages]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            loadRequestMessages(button.getAttribute("data-request-messages"));
           });
         });
       }
@@ -3537,7 +3583,7 @@
             '<strong>' + esc(application.status === "approved" ? "승인됨" : "승인 대기") + '</strong>' +
             '<span>' + esc(application.message || "메시지 없음") + '</span>' +
             (application.report_status ? '<span>' + esc("보고: " + reportStatusLabel(application.report_status) + " / " + (application.estimate_amount || "-")) + '</span>' : '') +
-            (application.status === "approved" ? '<button class="chip" type="button" data-app-detail="' + escAttr(application.request_id) + '">상세주소 보기</button><button class="chip" type="button" data-submit-report="' + escAttr(application.id) + '">방문/견적 보고</button>' : '') +
+            (application.status === "approved" ? '<button class="chip" type="button" data-app-detail="' + escAttr(application.request_id) + '">상세주소 보기</button><button class="chip" type="button" data-submit-report="' + escAttr(application.id) + '">방문/견적 보고</button><button class="chip" type="button" data-request-messages="' + escAttr(application.id) + '">쪽지</button>' : '') +
             '</li>';
         }).join("");
 
@@ -3551,6 +3597,73 @@
             submitFieldReport(button.getAttribute("data-submit-report"));
           });
         });
+        fieldRequestList.querySelectorAll("[data-request-messages]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            loadRequestMessages(button.getAttribute("data-request-messages"));
+          });
+        });
+      }
+
+      async function loadRequestMessages(applicationId) {
+        if (!state.authSession) {
+          fieldStatus.textContent = "쪽지는 로그인이 필요합니다.";
+          return;
+        }
+        fieldStatus.textContent = "쪽지를 불러오는 중입니다.";
+        try {
+          var response = await fetch("/api/request-messages?application_id=" + encodeURIComponent(applicationId), { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "쪽지를 불러오지 못했습니다.");
+          renderRequestMessages(applicationId, data.messages || [], data.context || {});
+          fieldStatus.textContent = "쪽지를 불러왔습니다.";
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
+      }
+
+      function renderRequestMessages(applicationId, messages, context) {
+        var viewerRole = context.viewer_role || "";
+        var messageHtml = messages.length ? messages.map(function (message) {
+          var mine = state.authSession && state.authSession.user && message.sender_user_id === state.authSession.user.id;
+          return '<li class="note-card"><strong>' + esc(mine ? "나" : (viewerRole === "owner" ? "업체" : "요청자")) + '</strong><span>' + esc(formatDateTime(message.created_at)) + '</span><span>' + esc(message.body || "") + '</span></li>';
+        }).join("") : '<li class="note-card"><span>아직 주고받은 쪽지가 없습니다.</span></li>';
+        fieldRequestList.innerHTML =
+          '<li class="note-card"><button class="chip" type="button" data-back-applied="1">내 신청</button><button class="chip" type="button" data-back-my-requests="1">내 요청</button><strong>현장요청 쪽지</strong><span>승인된 요청 관계자만 볼 수 있습니다.</span><textarea id="requestMessageBody" placeholder="쪽지를 입력하세요"></textarea><button class="chip" type="button" data-send-request-message="' + escAttr(applicationId) + '">쪽지 보내기</button></li>' +
+          messageHtml;
+        fieldRequestList.querySelectorAll("[data-send-request-message]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            sendRequestMessage(button.getAttribute("data-send-request-message"));
+          });
+        });
+        fieldRequestList.querySelectorAll("[data-back-applied]").forEach(function (button) {
+          button.addEventListener("click", loadAppliedFieldRequests);
+        });
+        fieldRequestList.querySelectorAll("[data-back-my-requests]").forEach(function (button) {
+          button.addEventListener("click", loadMyFieldRequests);
+        });
+      }
+
+      async function sendRequestMessage(applicationId) {
+        var textarea = document.getElementById("requestMessageBody");
+        var body = textarea ? textarea.value.trim() : "";
+        if (!body) {
+          fieldStatus.textContent = "쪽지 내용을 입력해주세요.";
+          return;
+        }
+        fieldStatus.textContent = "쪽지를 보내는 중입니다.";
+        try {
+          var response = await fetch("/api/request-messages", {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ application_id: applicationId, body: body })
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "쪽지 전송에 실패했습니다.");
+          fieldStatus.textContent = "쪽지를 보냈습니다.";
+          loadRequestMessages(applicationId);
+        } catch (error) {
+          fieldStatus.textContent = error.message;
+        }
       }
 
       async function submitFieldReport(applicationId) {
@@ -3639,7 +3752,7 @@
           boardStatus.textContent = "게시판 글쓰기는 로그인이 필요합니다.";
           return;
         }
-        var payload = { title: boardTitleInput.value.trim(), body: boardBodyInput.value.trim() };
+        var payload = { category: boardWriteCategoryInput.value, title: boardTitleInput.value.trim(), body: boardBodyInput.value.trim() };
         if (!payload.title || !payload.body) {
           boardStatus.textContent = "제목과 내용을 입력해주세요.";
           return;
@@ -3666,7 +3779,10 @@
         }
         boardStatus.textContent = "게시글을 불러오는 중입니다.";
         try {
-          var response = await fetch("/api/board", { headers: authHeaders() });
+          var params = new URLSearchParams();
+          if (state.boardCategory) params.set("category", state.boardCategory);
+          if (state.boardSearch) params.set("q", state.boardSearch);
+          var response = await fetch("/api/board" + (params.toString() ? "?" + params.toString() : ""), { headers: authHeaders() });
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "게시글을 불러오지 못했습니다.");
           state.boardPosts = data.posts || [];
@@ -3692,7 +3808,7 @@
         var pagePosts = posts.slice(start, start + pageSize);
         boardList.innerHTML = pagePosts.map(function (post, index) {
           var number = total - start - index;
-          var meta = ["#" + number, post.author_name || "\uC775\uBA85 \uC0AC\uC6A9\uC790", formatDateTime(post.updated_at || post.created_at), "\uB313\uAE00 " + Number(post.comment_count || 0)].filter(Boolean).join(" | ");
+          var meta = ["#" + number, boardCategoryLabel(post.category), post.author_name || "\uC775\uBA85 \uC0AC\uC6A9\uC790", formatDateTime(post.updated_at || post.created_at), "조회 " + Number(post.view_count || 0), "\uB313\uAE00 " + Number(post.comment_count || 0)].filter(Boolean).join(" | ");
           return '<li class="note-card"><button class="chip" type="button" data-open-board-post="' + escAttr(post.id) + '">\uC5F4\uAE30</button><strong>' + esc(number + '. ' + (post.title || "\uC81C\uBAA9 \uC5C6\uC74C")) + '</strong><span>' + esc(meta) + '</span><span>' + esc(shortText(post.body, 90)) + '</span></li>';
         }).join("") + renderBoardPager(totalPages);
         boardList.querySelectorAll("[data-open-board-post]").forEach(function (button) {
@@ -3713,6 +3829,13 @@
           buttons.push('<button class="chip" type="button" data-board-page="' + page + '"' + (page === state.boardPage ? ' aria-current="page"' : '') + '>' + page + '</button>');
         }
         return '<li class="note-card"><strong>\uBAA9\uB85D \uBC88\uD638</strong><div class="button-row">' + buttons.join("") + '</div></li>';
+      }
+
+      function boardCategoryLabel(category) {
+        if (category === "notice") return "공지";
+        if (category === "question") return "질문";
+        if (category === "review") return "후기";
+        return "자유";
       }
 
       async function loadBoardPostDetail(postId) {
@@ -3740,7 +3863,7 @@
           var meta = ["\uB313\uAE00 " + (index + 1), comment.author_name || "\uC775\uBA85 \uC0AC\uC6A9\uC790", formatDateTime(comment.created_at)].filter(Boolean).join(" | ");
           return '<li class="note-card"><strong>' + esc(meta) + '</strong><span>' + esc(comment.body || "") + '</span>' + (canDeleteComment ? '<button class="chip" type="button" data-board-comment-delete="' + escAttr(comment.id) + '">\uC0AD\uC81C</button>' : '') + '</li>';
         }).join("") : '<li class="note-card"><span>\uC544\uC9C1 \uB313\uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</span></li>';
-        boardList.innerHTML = '<li class="note-card"><button class="chip" type="button" data-board-back="1">\uBAA9\uB85D</button>' + (mine ? '<button class="chip" type="button" data-board-edit="' + escAttr(post.id) + '">\uC218\uC815</button>' : '') + (canModeratePost ? '<button class="chip" type="button" data-board-delete="' + escAttr(post.id) + '">\uC0AD\uC81C</button>' : '') + '<strong>' + esc(post.title || "\uC81C\uBAA9 \uC5C6\uC74C") + '</strong><span>' + esc([post.author_name || "\uC775\uBA85 \uC0AC\uC6A9\uC790", formatDateTime(post.created_at)].filter(Boolean).join(" | ")) + '</span><span>' + esc(post.body || "") + '</span></li><li class="note-card"><strong>\uB313\uAE00</strong><textarea id="boardCommentBody" placeholder="\uB313\uAE00\uC744 \uC785\uB825\uD558\uC138\uC694"></textarea><button class="chip" type="button" data-board-comment="' + escAttr(post.id) + '">\uB313\uAE00 \uB4F1\uB85D</button></li>' + commentHtml;
+        boardList.innerHTML = '<li class="note-card"><button class="chip" type="button" data-board-back="1">\uBAA9\uB85D</button>' + (mine ? '<button class="chip" type="button" data-board-edit="' + escAttr(post.id) + '">\uC218\uC815</button>' : '') + (canModeratePost ? '<button class="chip" type="button" data-board-delete="' + escAttr(post.id) + '">\uC0AD\uC81C</button>' : '') + '<strong>' + esc(post.title || "\uC81C\uBAA9 \uC5C6\uC74C") + '</strong><span>' + esc([boardCategoryLabel(post.category), post.author_name || "\uC775\uBA85 \uC0AC\uC6A9\uC790", formatDateTime(post.created_at), "조회 " + Number(post.view_count || 0)].filter(Boolean).join(" | ")) + '</span><span>' + esc(post.body || "") + '</span></li><li class="note-card"><strong>\uB313\uAE00</strong><textarea id="boardCommentBody" placeholder="\uB313\uAE00\uC744 \uC785\uB825\uD558\uC138\uC694"></textarea><button class="chip" type="button" data-board-comment="' + escAttr(post.id) + '">\uB313\uAE00 \uB4F1\uB85D</button></li>' + commentHtml;
         boardList.querySelectorAll("[data-board-back]").forEach(function (button) { button.addEventListener("click", loadBoardPosts); });
         boardList.querySelectorAll("[data-board-comment]").forEach(function (button) { button.addEventListener("click", function () { createBoardComment(button.getAttribute("data-board-comment")); }); });
         boardList.querySelectorAll("[data-board-edit]").forEach(function (button) { button.addEventListener("click", function () { editBoardPost(button.getAttribute("data-board-edit")); }); });
@@ -3776,7 +3899,7 @@
         if (body === null) return;
         boardStatus.textContent = "게시글을 수정하는 중입니다.";
         try {
-          var response = await fetch("/api/board", { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ post_id: postId, title: title, body: body }) });
+          var response = await fetch("/api/board", { method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ post_id: postId, category: post.category || "free", title: title, body: body }) });
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "게시글 수정에 실패했습니다.");
           boardStatus.textContent = "게시글을 수정했습니다.";

@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const POSTS_TABLE = "board_posts";
 const COMMENTS_TABLE = "board_comments";
 const PROFILES_TABLE = "user_profiles";
-const POST_COLUMNS = "id,author_user_id,title,body,status,created_at,updated_at";
+const POST_COLUMNS = "id,author_user_id,title,body,category,view_count,is_pinned,status,created_at,updated_at";
 const COMMENT_COLUMNS = "id,post_id,author_user_id,body,status,created_at,updated_at";
 const PROFILE_COLUMNS = "user_id,email,display_name,company_name";
 
@@ -27,6 +27,11 @@ module.exports = async (req, res) => {
 
         const posts = await supabaseRequest(`${POSTS_TABLE}?id=eq.${encodeURIComponent(postId)}&status=eq.active&select=${POST_COLUMNS}&limit=1`, { method: "GET" });
         if (!posts.length) return res.status(404).json({ ok: false, message: "글을 찾을 수 없습니다." });
+        posts[0].view_count = Number(posts[0].view_count || 0) + 1;
+        await supabaseRequest(`${POSTS_TABLE}?id=eq.${encodeURIComponent(postId)}&select=${POST_COLUMNS}`, {
+          method: "PATCH",
+          body: JSON.stringify({ view_count: posts[0].view_count }),
+        });
 
         const comments = await supabaseRequest(`${COMMENTS_TABLE}?post_id=eq.${encodeURIComponent(postId)}&status=eq.active&select=${COMMENT_COLUMNS}&order=created_at.asc&limit=200`, { method: "GET" });
         const enrichedPosts = await attachAuthors(posts);
@@ -34,7 +39,17 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true, viewer_user_id: user.id, viewer_is_admin: viewerIsAdmin, post: enrichedPosts[0], comments: enrichedComments });
       }
 
-      const posts = await supabaseRequest(`${POSTS_TABLE}?status=eq.active&select=${POST_COLUMNS}&order=updated_at.desc&limit=100`, { method: "GET" });
+      const category = normalizeCategory(req.query.category);
+      const search = clamp(req.query.q, 80);
+      const filters = [
+        "status=eq.active",
+        `select=${POST_COLUMNS}`,
+        category ? `category=eq.${encodeURIComponent(category)}` : "",
+        search ? `or=(title.ilike.*${encodeURIComponent(search)}*,body.ilike.*${encodeURIComponent(search)}*)` : "",
+        "order=is_pinned.desc,updated_at.desc",
+        "limit=100",
+      ].filter(Boolean).join("&");
+      const posts = await supabaseRequest(`${POSTS_TABLE}?${filters}`, { method: "GET" });
       const withAuthors = await attachAuthors(await attachCommentCounts(posts));
       return res.status(200).json({ ok: true, viewer_user_id: user.id, viewer_is_admin: viewerIsAdmin, posts: withAuthors });
     }
@@ -72,6 +87,7 @@ module.exports = async (req, res) => {
         author_user_id: user.id,
         title: clamp(body.title, 120),
         body: clamp(body.body, 5000),
+        category: normalizeCategory(body.category) || "free",
         status: "active",
       };
       if (!row.title || !row.body) return res.status(400).json({ ok: false, message: "제목과 내용을 입력해주세요." });
@@ -125,6 +141,7 @@ module.exports = async (req, res) => {
       const row = {
         title: clamp(body.title, 120),
         body: clamp(body.body, 5000),
+        category: normalizeCategory(body.category) || post.category || "free",
         updated_at: new Date().toISOString(),
       };
       if (!row.title || !row.body) return res.status(400).json({ ok: false, message: "\uC81C\uBAA9\uACFC \uB0B4\uC6A9\uC744 \uC785\uB825\uD574\uC8FC\uC138\uC694." });
@@ -294,6 +311,11 @@ function toKoreanError(error) {
 function cleanId(value) {
   const id = String(value || "").trim();
   return /^[a-zA-Z0-9_-]{6,40}$/.test(id) ? id : "";
+}
+
+function normalizeCategory(value) {
+  const category = String(value || "").trim();
+  return ["notice", "free", "question", "review"].includes(category) ? category : "";
 }
 
 function clamp(value, max) {
