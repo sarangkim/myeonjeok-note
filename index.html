@@ -1355,9 +1355,9 @@
         <div class="main-menu" id="mainMenu" hidden>
           <button class="active" type="button" data-side-view="notes">&#45236; &#47700;&#47784;</button>
           <button type="button" data-side-view="estimate">&#44204;&#51201;</button>
-          <button type="button" data-side-view="public">&#44277;&#44060; &#50836;&#52397;</button>
-          <button type="button" data-side-view="mine">&#45236; &#50836;&#52397;</button>
-          <button type="button" data-side-view="applied">&#45236; &#49888;&#52397;</button>
+          <button type="button" data-side-view="public">현장요청 찾기</button>
+          <button type="button" data-side-view="mine">내가 올린 요청</button>
+          <button type="button" data-side-view="applied">내가 지원한 요청</button>
           <button type="button" data-side-view="board">&#44172;&#49884;&#54032;</button>
           <button type="button" data-side-view="adminProviders" id="adminProvidersMenu" hidden>&#50629;&#52404; &#49849;&#51064;</button>
         </div>
@@ -1623,7 +1623,7 @@
         </div>
 
         <div class="side-panel" id="requestsPanel" hidden>
-          <h2 id="requestsPanelTitle">공개 요청</h2>
+          <h2 id="requestsPanelTitle">현장요청 찾기</h2>
           <div class="field-form">
             <div class="field-create" id="fieldCreateBlock" hidden>
               <input id="fieldPublicArea" placeholder="공개 위치 예: 서울 강서구 마곡동">
@@ -1636,9 +1636,9 @@
               <div class="inline-status" id="fieldCreateStatus" role="status" aria-live="polite"></div>
             </div>
             <div class="legacy-field-actions" hidden>
-              <button class="secondary" id="loadFieldRequestsBtn" type="button">공개 요청 보기</button>
-              <button class="secondary" id="loadMyFieldRequestsBtn" type="button">내 요청 보기</button>
-              <button class="secondary" id="loadAppliedFieldRequestsBtn" type="button">내 신청 보기</button>
+              <button class="secondary" id="loadFieldRequestsBtn" type="button">현장요청 목록</button>
+              <button class="secondary" id="loadMyFieldRequestsBtn" type="button">내가 올린 요청</button>
+              <button class="secondary" id="loadAppliedFieldRequestsBtn" type="button">내가 지원한 요청</button>
             </div>
           </div>
           <div class="note" id="fieldStatus"></div>
@@ -2985,13 +2985,13 @@
           syncEstimateArea(state.currentResult);
           renderEstimate();
         } else if (view === "public") {
-          requestsPanelTitle.textContent = "\uACF5\uAC1C \uC694\uCCAD";
+          requestsPanelTitle.textContent = "현장요청 찾기";
           loadFieldRequests();
         } else if (view === "mine") {
-          requestsPanelTitle.textContent = "\uB0B4 \uC694\uCCAD";
+          requestsPanelTitle.textContent = "내가 올린 요청";
           loadMyFieldRequests();
         } else if (view === "applied") {
-          requestsPanelTitle.textContent = "\uB0B4 \uC2E0\uCCAD";
+          requestsPanelTitle.textContent = "내가 지원한 요청";
           loadAppliedFieldRequests();
         } else if (isBoard) {
           loadBoardPosts();
@@ -3576,7 +3576,7 @@
           });
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "현장 요청 등록에 실패했습니다.");
-          setFieldCreateStatus("등록되었습니다. 내 요청 메뉴에서 신청 현황을 확인할 수 있습니다.");
+          setFieldCreateStatus("등록되었습니다. 내가 올린 요청 메뉴에서 신청 현황을 확인할 수 있습니다.");
           fieldDescriptionInput.value = "";
           loadProfile();
         } catch (error) {
@@ -3587,13 +3587,13 @@
       }
 
       async function loadFieldRequests() {
-        fieldStatus.textContent = "공개 요청을 불러오는 중입니다.";
+        fieldStatus.textContent = "현장요청을 불러오는 중입니다.";
         try {
           var response = await fetch("/api/field-requests", { headers: state.authSession ? authHeaders() : {} });
           var data = await response.json().catch(function () { return null; });
-          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "공개 요청을 불러오지 못했습니다.");
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "현장요청을 불러오지 못했습니다.");
           renderFieldRequests(data.requests || [], !!data.can_apply);
-          fieldStatus.textContent = "공개 요청을 불러왔습니다.";
+          fieldStatus.textContent = "현장요청을 불러왔습니다.";
         } catch (error) {
           fieldStatus.textContent = error.message;
         }
@@ -3656,17 +3656,17 @@
 
       async function loadMyFieldRequests() {
         if (!state.authSession) {
-          fieldStatus.textContent = "내 요청 보기는 로그인이 필요합니다.";
+          fieldStatus.textContent = "내가 올린 요청 보기는 로그인이 필요합니다.";
           return;
         }
 
-        fieldStatus.textContent = "내 요청을 불러오는 중입니다.";
+        fieldStatus.textContent = "내가 올린 요청을 불러오는 중입니다.";
         try {
           var response = await fetch("/api/field-requests?mine=1", { headers: authHeaders() });
           var data = await response.json().catch(function () { return null; });
-          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "내 요청을 불러오지 못했습니다.");
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "내가 올린 요청을 불러오지 못했습니다.");
           renderMyFieldRequests(data.requests || []);
-          fieldStatus.textContent = "내 요청을 불러왔습니다.";
+          fieldStatus.textContent = "내가 올린 요청을 불러왔습니다.";
         } catch (error) {
           fieldStatus.textContent = error.message;
         }
@@ -3743,7 +3743,7 @@
             (application.status === "approved" ? '<button class="chip" type="button" data-request-messages="' + escAttr(application.id) + '">쪽지</button>' : '') +
             (application.status === "approved" ? '' : '<button class="chip" type="button" data-approve-app="' + escAttr(application.id) + '">승인</button>') +
             '</li>';
-        }).join("") + '<li class="note-card"><button class="chip" type="button" data-back-my-requests="1">내 요청으로 돌아가기</button></li>';
+        }).join("") + '<li class="note-card"><button class="chip" type="button" data-back-my-requests="1">내가 올린 요청으로 돌아가기</button></li>';
 
         fieldRequestList.querySelectorAll("[data-approve-app]").forEach(function (button) {
           button.addEventListener("click", function () {
@@ -3885,12 +3885,12 @@
 
       function renderFieldRequestDetail(request, access) {
         fieldRequestList.innerHTML = '<li class="note-card">' +
-          '<strong>' + esc(access === "owner" ? "내 요청 상세주소" : "승인된 요청 상세주소") + '</strong>' +
+          '<strong>' + esc(access === "owner" ? "내가 올린 요청 상세주소" : "승인된 요청 상세주소") + '</strong>' +
           '<span>' + esc(request.road || request.address || "-") + '</span>' +
           '<span>' + esc(formatFieldLocation(request)) + '</span>' +
           requesterContactHtml(request, access) +
           '<span>' + esc(request.description || "") + '</span>' +
-          '</li><li class="note-card"><button class="chip" type="button" data-load-public-requests="1">공개 요청으로 돌아가기</button></li>';
+          '</li><li class="note-card"><button class="chip" type="button" data-load-public-requests="1">현장요청 찾기로 돌아가기</button></li>';
 
         fieldRequestList.querySelectorAll("[data-load-public-requests]").forEach(function (button) {
           button.addEventListener("click", loadFieldRequests);
@@ -3899,17 +3899,17 @@
 
       async function loadAppliedFieldRequests() {
         if (!state.authSession) {
-          fieldStatus.textContent = "내 신청 보기는 로그인이 필요합니다.";
+          fieldStatus.textContent = "내가 지원한 요청 보기는 로그인이 필요합니다.";
           return;
         }
 
-        fieldStatus.textContent = "내 신청을 불러오는 중입니다.";
+        fieldStatus.textContent = "내가 지원한 요청을 불러오는 중입니다.";
         try {
           var response = await fetch("/api/field-requests?applied=1", { headers: authHeaders() });
           var data = await response.json().catch(function () { return null; });
-          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "내 신청을 불러오지 못했습니다.");
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "내가 지원한 요청을 불러오지 못했습니다.");
           renderAppliedFieldRequests(data.applications || []);
-          fieldStatus.textContent = "내 신청을 불러왔습니다.";
+          fieldStatus.textContent = "내가 지원한 요청을 불러왔습니다.";
         } catch (error) {
           fieldStatus.textContent = error.message;
         }
@@ -3985,7 +3985,7 @@
           return '<li class="note-card"><strong>' + esc(mine ? "나" : (viewerRole === "owner" ? "업체" : "요청자")) + '</strong><span>' + esc(formatDateTime(message.created_at)) + '</span><span>' + esc(message.body || "") + '</span></li>';
         }).join("") : '<li class="note-card"><span>아직 주고받은 쪽지가 없습니다.</span></li>';
         fieldRequestList.innerHTML =
-          '<li class="note-card"><button class="chip" type="button" data-back-applied="1">내 신청</button><button class="chip" type="button" data-back-my-requests="1">내 요청</button><strong>현장요청 쪽지</strong><span>승인된 요청 관계자만 볼 수 있습니다.</span><textarea id="requestMessageBody" placeholder="쪽지를 입력하세요"></textarea><button class="chip" type="button" data-send-request-message="' + escAttr(applicationId) + '">쪽지 보내기</button></li>' +
+          '<li class="note-card"><button class="chip" type="button" data-back-applied="1">내가 지원한 요청</button><button class="chip" type="button" data-back-my-requests="1">내가 올린 요청</button><strong>현장요청 쪽지</strong><span>승인된 요청 관계자만 볼 수 있습니다.</span><textarea id="requestMessageBody" placeholder="쪽지를 입력하세요"></textarea><button class="chip" type="button" data-send-request-message="' + escAttr(applicationId) + '">쪽지 보내기</button></li>' +
           messageHtml;
         fieldRequestList.querySelectorAll("[data-send-request-message]").forEach(function (button) {
           button.addEventListener("click", function () {
