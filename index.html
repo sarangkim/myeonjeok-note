@@ -609,9 +609,10 @@
     }
 
     .workspace {
+      --side-panel-width: 360px;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 300px;
-      gap: 14px;
+      grid-template-columns: minmax(0, 1fr) 12px var(--side-panel-width);
+      gap: 8px;
       margin-top: 14px;
       align-items: start;
     }
@@ -626,6 +627,51 @@
 
     .workspace.no-results .note-panel {
       position: static;
+    }
+
+    .workspace.no-results .workspace-resizer {
+      display: none;
+    }
+
+    .workspace-resizer {
+      position: sticky;
+      top: 14px;
+      align-self: stretch;
+      min-height: 220px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      cursor: col-resize;
+      padding: 0;
+      box-shadow: none;
+      touch-action: none;
+    }
+
+    .workspace-resizer::before {
+      content: "";
+      display: block;
+      width: 4px;
+      height: 100%;
+      min-height: 220px;
+      margin: 0 auto;
+      border-radius: 999px;
+      background: rgba(30, 111, 92, 0.14);
+      transition: background 0.16s ease, width 0.16s ease;
+    }
+
+    .workspace-resizer:hover,
+    .workspace-resizer:focus-visible,
+    body.resizing-workspace .workspace-resizer {
+      background: transparent;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .workspace-resizer:hover::before,
+    .workspace-resizer:focus-visible::before,
+    body.resizing-workspace .workspace-resizer::before {
+      width: 6px;
+      background: rgba(30, 111, 92, 0.38);
     }
 
     .workspace.no-results .side-tabs {
@@ -1049,6 +1095,64 @@
       font-weight: 950;
     }
 
+    .pyeong-cell {
+      color: #d92f72;
+      font-weight: 950;
+    }
+
+    .board-status {
+      border: 1px solid rgba(30, 111, 92, 0.18);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.6);
+      padding: 10px 12px;
+    }
+
+    .board-status.success {
+      border-color: rgba(30, 111, 92, 0.26);
+      background: rgba(229, 242, 238, 0.86);
+      color: var(--brand-strong);
+      font-weight: 850;
+    }
+
+    .board-status.error {
+      border-color: rgba(164, 61, 53, 0.26);
+      background: rgba(255, 239, 237, 0.88);
+      color: var(--danger);
+      font-weight: 850;
+    }
+
+    .board-list-card {
+      display: grid;
+      gap: 8px;
+    }
+
+    .board-title-link {
+      display: inline;
+      min-height: 0;
+      width: fit-content;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1.4;
+      padding: 0;
+      text-align: left;
+      white-space: normal;
+    }
+
+    .board-title-link:hover,
+    .board-title-link:focus-visible {
+      background: transparent;
+      box-shadow: none;
+      color: var(--brand-strong);
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      transform: none;
+    }
+
     .note-card {
       border-color: rgba(30, 111, 92, 0.12);
       border-radius: 14px;
@@ -1323,6 +1427,10 @@
         grid-template-columns: 1fr;
       }
 
+      .workspace-resizer {
+        display: none;
+      }
+
       .workspace.no-results .side-tabs,
       .workspace.no-results .field-create:not([hidden]) {
         grid-template-columns: 1fr 1fr;
@@ -1428,6 +1536,7 @@
 
     <div class="workspace no-results" id="workspace">
       <main class="results" id="results"></main>
+      <button class="workspace-resizer" id="workspaceResizer" type="button" aria-label="게시판 영역 크기 조절"></button>
       <aside class="note-panel">
         <div class="side-panel" id="notesPanel">
           <h2>내 메모</h2>
@@ -1614,7 +1723,7 @@
             <textarea id="boardBody" placeholder="내용을 입력하세요. 로그인한 사람만 볼 수 있습니다."></textarea>
             <button id="createBoardPostBtn" type="button">글 등록</button>
           </div>
-          <div class="note" id="boardStatus"></div>
+          <div class="note board-status" id="boardStatus" role="status" aria-live="polite"></div>
           <ul class="note-list" id="boardList"></ul>
         </div>
 
@@ -1697,6 +1806,7 @@
       var statusEl = document.getElementById("status");
       var topAdSlot = document.getElementById("topAdSlot");
       var workspaceEl = document.getElementById("workspace");
+      var workspaceResizer = document.getElementById("workspaceResizer");
       var resultsEl = document.getElementById("results");
       var noteList = document.getElementById("noteList");
       var emptyNote = document.getElementById("emptyNote");
@@ -1924,6 +2034,7 @@
       initAds();
       initSearchProgressiveFields();
       initInstallShortcut();
+      initWorkspaceResize();
       loadSharedNoteFromUrl();
       updateWorkspaceLayout();
 
@@ -2159,6 +2270,50 @@
         var hasResults = !!(resultsEl && resultsEl.children.length);
         workspaceEl.classList.toggle("no-results", !hasResults);
         observeRevealCards();
+      }
+
+      function initWorkspaceResize() {
+        if (!workspaceEl || !workspaceResizer) return;
+        var savedWidth = Number(localStorage.getItem("estimateNoteSidePanelWidth") || 0);
+        if (savedWidth) setSidePanelWidth(savedWidth);
+        var active = false;
+
+        function move(clientX) {
+          if (!active) return;
+          var rect = workspaceEl.getBoundingClientRect();
+          var nextWidth = rect.right - clientX - 8;
+          setSidePanelWidth(nextWidth);
+        }
+
+        function stop() {
+          if (!active) return;
+          active = false;
+          document.body.classList.remove("resizing-workspace");
+          var width = parseInt(getComputedStyle(workspaceEl).getPropertyValue("--side-panel-width"), 10);
+          if (width) localStorage.setItem("estimateNoteSidePanelWidth", String(width));
+        }
+
+        workspaceResizer.addEventListener("pointerdown", function (event) {
+          if (window.matchMedia("(max-width: 860px)").matches) return;
+          active = true;
+          document.body.classList.add("resizing-workspace");
+          workspaceResizer.setPointerCapture(event.pointerId);
+          move(event.clientX);
+        });
+        workspaceResizer.addEventListener("pointermove", function (event) {
+          move(event.clientX);
+        });
+        workspaceResizer.addEventListener("pointerup", stop);
+        workspaceResizer.addEventListener("pointercancel", stop);
+      }
+
+      function setSidePanelWidth(width) {
+        if (!workspaceEl) return;
+        var appWidth = workspaceEl.getBoundingClientRect().width || 1120;
+        var min = 280;
+        var max = Math.min(520, Math.max(min, appWidth - 360));
+        var next = Math.max(min, Math.min(max, Math.round(width)));
+        workspaceEl.style.setProperty("--side-panel-width", next + "px");
       }
 
       function observeRevealCards() {
@@ -2530,7 +2685,7 @@
         return [
           '<div class="table-wrap"><table><thead><tr><th>구분</th><th>용도</th><th>상세</th><th class="num">m²</th><th class="num">평</th></tr></thead><tbody>',
           items.map(function (item) {
-            return '<tr><td>' + esc(item.gb) + '</td><td>' + esc(item.use) + '</td><td>' + esc(item.detail) + '</td><td class="num">' + fmt(item.area_m2) + '</td><td class="num">' + fmt(item.area_pyeong) + '</td></tr>';
+            return '<tr><td>' + esc(item.gb) + '</td><td>' + esc(item.use) + '</td><td>' + esc(item.detail) + '</td><td class="num">' + fmt(item.area_m2) + '</td><td class="num pyeong-cell">' + fmt(item.area_pyeong) + '</td></tr>';
           }).join(""),
           '</tbody></table></div>'
         ].join("");
@@ -2559,7 +2714,7 @@
         return [
           '<div class="table-wrap"><table><thead><tr><th>구분</th><th>층</th><th>호</th><th>용도</th><th class="num">m²</th><th class="num">평</th></tr></thead><tbody>',
           rows.map(function (row) {
-            return '<tr><td>' + esc(row.gb || "-") + '</td><td>' + esc(row.flrNm || "-") + '</td><td>' + esc(row.ho || "-") + '</td><td>' + esc(row.use || "-") + '</td><td class="num">' + fmt(row.area_m2) + '</td><td class="num">' + fmt(row.area_pyeong) + '</td></tr>';
+            return '<tr><td>' + esc(row.gb || "-") + '</td><td>' + esc(row.flrNm || "-") + '</td><td>' + esc(row.ho || "-") + '</td><td>' + esc(row.use || "-") + '</td><td class="num">' + fmt(row.area_m2) + '</td><td class="num pyeong-cell">' + fmt(row.area_pyeong) + '</td></tr>';
           }).join(""),
           '</tbody></table></div>'
         ].join("");
@@ -4239,7 +4394,7 @@
         var hiddenPosts = data.hidden_posts || [];
         var hiddenComments = data.hidden_comments || [];
         var reportHtml = reports.length ? reports.map(function (report) {
-          return '<li class="note-card"><strong>' + esc("신고: " + (report.target_type === "comment" ? "댓글" : "게시글")) + '</strong><span>' + esc(report.reason || "") + '</span><span>' + esc(formatDateTime(report.created_at)) + '</span>' + (report.post_id ? '<button class="chip" type="button" data-open-board-post="' + escAttr(report.post_id) + '">글 열기</button>' : '') + '</li>';
+          return '<li class="note-card board-list-card"><button class="board-title-link" type="button"' + (report.post_id ? ' data-open-board-post="' + escAttr(report.post_id) + '"' : ' disabled') + '>' + esc("신고 대상 확인: " + (report.target_type === "comment" ? "댓글" : "게시글")) + '</button><span>' + esc(report.reason || "") + '</span><span>' + esc(formatDateTime(report.created_at)) + '</span></li>';
         }).join("") : '<li class="note-card"><span>접수된 신고가 없습니다.</span></li>';
         var hiddenPostHtml = hiddenPosts.length ? hiddenPosts.map(function (post) {
           return '<li class="note-card"><strong>' + esc(post.title || "제목 없음") + '</strong>' + boardAuthorHtml(post) + '<span>' + esc([boardCategoryLabel(post.category), formatDateTime(post.updated_at)].filter(Boolean).join(" | ")) + '</span></li>';
@@ -4270,7 +4425,7 @@
         boardList.innerHTML = pagePosts.map(function (post, index) {
           var number = total - start - index;
           var meta = ["#" + number, boardCategoryLabel(post.category), formatDateTime(post.updated_at || post.created_at), "조회 " + Number(post.view_count || 0), "\uB313\uAE00 " + Number(post.comment_count || 0)].filter(Boolean).join(" | ");
-          return '<li class="note-card"><button class="chip" type="button" data-open-board-post="' + escAttr(post.id) + '">\uC5F4\uAE30</button><strong>' + esc((post.is_pinned ? "[고정] " : "") + number + '. ' + (post.title || "\uC81C\uBAA9 \uC5C6\uC74C")) + '</strong>' + boardAuthorHtml(post) + '<span>' + esc(meta) + '</span><span>' + esc(shortText(post.body, 90)) + '</span></li>';
+          return '<li class="note-card board-list-card"><button class="board-title-link" type="button" data-open-board-post="' + escAttr(post.id) + '">' + esc((post.is_pinned ? "[고정] " : "") + number + ". " + (post.title || "제목 없음")) + '</button>' + boardAuthorHtml(post) + '<span>' + esc(meta) + '</span><span>' + esc(shortText(post.body, 90)) + '</span></li>';
         }).join("") + renderBoardPager(totalPages);
         boardList.querySelectorAll("[data-open-board-post]").forEach(function (button) {
           button.addEventListener("click", function () { loadBoardPostDetail(button.getAttribute("data-open-board-post")); });
@@ -4290,6 +4445,12 @@
           buttons.push('<button class="chip" type="button" data-board-page="' + page + '"' + (page === state.boardPage ? ' aria-current="page"' : '') + '>' + page + '</button>');
         }
         return '<li class="note-card"><strong>\uBAA9\uB85D \uBC88\uD638</strong><div class="button-row">' + buttons.join("") + '</div></li>';
+      }
+
+      function setBoardStatus(message, type) {
+        boardStatus.textContent = message || "";
+        boardStatus.className = "note board-status" + (type ? " " + type : "");
+        if (message && type) boardStatus.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }
 
       function boardCategoryLabel(category) {
@@ -4390,7 +4551,7 @@
           var response = await fetch("/api/board", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ action: "comment", post_id: postId, body: body }) });
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "댓글 등록에 실패했습니다.");
-          boardStatus.textContent = "댓글을 등록했습니다.";
+          setBoardStatus("댓글을 등록했습니다.", "success");
           loadBoardPostDetail(postId);
         } catch (error) {
           boardStatus.textContent = error.message;
@@ -4501,7 +4662,7 @@
           });
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "신고 접수에 실패했습니다.");
-          boardStatus.textContent = "신고가 접수되었습니다.";
+          setBoardStatus("신고가 접수되었습니다. 관리자가 게시판의 신고/숨김 메뉴에서 확인할 수 있습니다.", "success");
         } catch (error) {
           boardStatus.textContent = error.message;
         }
