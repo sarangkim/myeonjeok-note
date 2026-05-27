@@ -3,13 +3,44 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="견적노트는 주소, 층, 호를 입력해 전유·공용 평수를 확인하고 청소 견적을 계산할 수 있는 면적 조회 도구입니다.">
+  <meta name="robots" content="index,follow">
+  <meta name="keywords" content="견적노트, 평수 조회, 청소 견적, 사무실 청소, 전유면적, 공용면적">
+  <link rel="canonical" href="https://area.happycleaning.co.kr/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:site_name" content="견적노트">
+  <meta property="og:title" content="견적노트 - 주소로 평수와 청소견적 확인">
+  <meta property="og:description" content="주소를 입력하면 평수를 알고 청소견적을 알아볼 수 있습니다.">
+  <meta property="og:url" content="https://area.happycleaning.co.kr/">
+  <meta property="og:image" content="https://area.happycleaning.co.kr/icons/estimate-note.svg">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="견적노트 - 주소로 평수와 청소견적 확인">
+  <meta name="twitter:description" content="주소를 입력하면 평수를 알고 청소견적을 알아볼 수 있습니다.">
+  <meta name="twitter:image" content="https://area.happycleaning.co.kr/icons/estimate-note.svg">
   <meta name="theme-color" content="#1e6f5c">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="????">
+  <meta name="apple-mobile-web-app-title" content="견적노트">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/estimate-note.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icons/estimate-note.svg">
-  <title>견적노트</title>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "견적노트",
+      "url": "https://area.happycleaning.co.kr/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "주소, 층, 호를 입력해 전유·공용 평수를 확인하고 청소 견적을 계산할 수 있는 면적 조회 도구입니다.",
+      "publisher": {
+        "@type": "Organization",
+        "name": "행복한청소",
+        "url": "https://happycleaning.co.kr/"
+      }
+    }
+  </script>
+  <title>견적노트 - 주소로 평수와 청소견적 확인</title>
   <style>
     :root {
       color-scheme: light;
@@ -2032,6 +2063,7 @@
 
       initAuth();
       initAds();
+      initAnalytics();
       initSearchProgressiveFields();
       initInstallShortcut();
       initWorkspaceResize();
@@ -2098,6 +2130,26 @@
           };
           document.head.appendChild(script);
         });
+      }
+
+      async function initAnalytics() {
+        try {
+          var config = await getConfig();
+          var measurementId = String((config && config.googleAnalyticsId) || "").trim();
+          if (!/^G-[A-Z0-9]+$/i.test(measurementId)) return;
+          if (document.querySelector('script[data-analytics-script="true"]')) return;
+
+          window.dataLayer = window.dataLayer || [];
+          window.gtag = function () { window.dataLayer.push(arguments); };
+          window.gtag("js", new Date());
+          window.gtag("config", measurementId, { anonymize_ip: true });
+
+          var script = document.createElement("script");
+          script.async = true;
+          script.dataset.analyticsScript = "true";
+          script.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(measurementId);
+          document.head.appendChild(script);
+        } catch (error) {}
       }
 
       function initSearchProgressiveFields() {
