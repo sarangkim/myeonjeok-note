@@ -11,6 +11,7 @@ module.exports = async (req, res) => {
   return res.status(200).json({
     ok: true,
     kakaoMapJsKey: process.env.KAKAO_MAP_JS_KEY || "",
+    googleAnalyticsId: process.env.GOOGLE_ANALYTICS_ID || "",
     supabaseUrl: cleanSupabaseUrl(process.env.SUPABASE_URL),
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "",
   });
