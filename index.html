@@ -1291,10 +1291,21 @@
       line-height: 1.45;
     }
 
+    .estimate-result .secondary {
+      width: 100%;
+      margin-top: 10px;
+      min-height: 44px;
+    }
+
     .quote-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+    }
+
+    .quote-actions .secondary {
+      min-height: 44px;
+      flex: 1 1 120px;
     }
 
     .quote-preview {
@@ -1304,6 +1315,25 @@
       border-radius: 16px;
       background: rgba(255, 255, 255, 0.72);
       padding: 14px;
+    }
+
+    .quote-edit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .quote-edit-grid label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .quote-edit-grid textarea,
+    .quote-edit-grid .quote-wide {
+      grid-column: 1 / -1;
     }
 
     .quote-upload {
@@ -1321,10 +1351,37 @@
       padding: 22px;
     }
 
+    .quote-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 2px solid #17352e;
+      padding-bottom: 12px;
+    }
+
+    .quote-logo {
+      display: grid;
+      place-items: center;
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #1f7a68, #f4c95d);
+      color: #fff;
+      font-size: 34px;
+      font-weight: 900;
+      box-shadow: 0 10px 22px rgba(30, 111, 92, 0.22);
+    }
+
     .quote-sheet h3 {
       margin: 0;
       font-size: 26px;
-      text-align: center;
+      text-align: left;
+    }
+
+    .quote-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
     }
 
     .quote-meta {
@@ -1343,6 +1400,17 @@
     .quote-table th,
     .quote-table td {
       white-space: normal;
+      border-bottom: 1px solid #e5ebe7;
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .quote-section {
+      border: 1px solid #dce5df;
+      border-radius: 12px;
+      padding: 12px;
+      line-height: 1.55;
     }
 
     .quote-total {
@@ -1383,24 +1451,88 @@
       object-fit: contain;
     }
 
+    @media (max-width: 640px) {
+      .quote-edit-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .quote-actions .secondary {
+        flex-basis: 100%;
+      }
+    }
+
     @media print {
-      body * {
-        visibility: hidden !important;
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
       }
 
-      #quoteSheet,
-      #quoteSheet * {
-        visibility: visible !important;
+      html,
+      body {
+        width: 210mm;
+        margin: 0 !important;
+        background: #fff !important;
       }
 
-      #quoteSheet {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        border: 0;
-        border-radius: 0;
+      body.printing-quote > :not(#quotePrintRoot) {
+        display: none !important;
+      }
+
+      #quotePrintRoot {
+        display: grid !important;
+        gap: 7mm !important;
+        width: 190mm !important;
+        min-height: auto !important;
+        margin: 0 auto !important;
+        border: 0 !important;
+        border-radius: 0 !important;
         box-shadow: none;
-        padding: 28px;
+        padding: 0 !important;
+        color: #111 !important;
+        font-size: 9.5pt !important;
+      }
+
+      #quotePrintRoot .quote-head {
+        padding-bottom: 5mm !important;
+      }
+
+      #quotePrintRoot .quote-logo {
+        width: 18mm !important;
+        height: 18mm !important;
+        border-radius: 5mm !important;
+        font-size: 24pt !important;
+        box-shadow: none !important;
+      }
+
+      #quotePrintRoot h3 {
+        font-size: 21pt !important;
+      }
+
+      #quotePrintRoot .quote-table {
+        font-size: 9.5pt !important;
+      }
+
+      #quotePrintRoot .quote-table th,
+      #quotePrintRoot .quote-table td {
+        padding: 2.8mm 2mm !important;
+      }
+
+      #quotePrintRoot .quote-section {
+        padding: 4mm !important;
+      }
+
+      #quotePrintRoot .quote-total {
+        padding: 5mm !important;
+        font-size: 15pt !important;
+      }
+
+      #quotePrintRoot .quote-stamp-row {
+        min-height: 22mm !important;
+      }
+
+      #quotePrintRoot .quote-stamp {
+        width: 24mm !important;
+        height: 24mm !important;
       }
     }
 
@@ -1836,7 +1968,7 @@
               <textarea id="estimateNotes" placeholder="&#50696;: &#50648;&#47532;&#48288;&#51060;&#53552; &#50630;&#51020;, &#51452;&#52264; &#50612;&#47140;&#50880;, &#50976;&#47532;&#52285; &#47566;&#51020;, &#51089;&#50629; &#49884;&#44036; &#51228;&#54620; &#46321;"></textarea>
             </label>
             <button id="calculateEstimateBtn" type="button">견적 계산</button>
-            <div class="quote-actions">
+            <div class="quote-actions" id="quoteActions" hidden>
               <button class="secondary" id="makeQuoteBtn" type="button">견적서 만들기</button>
               <button class="secondary" id="printQuoteBtn" type="button" hidden>인쇄/PDF 저장</button>
             </div>
@@ -1844,6 +1976,20 @@
               <div class="note">주소와 호실을 조회하면 면적이 자동으로 들어갑니다.</div>
             </div>
             <div class="quote-preview" id="quotePreview" hidden>
+              <div class="quote-edit-grid">
+                <label>
+                  견적서 제목
+                  <input id="quoteTitleInput" type="text" value="청소 견적서">
+                </label>
+                <label>
+                  견적 금액
+                  <input id="quoteAmountInput" type="text" placeholder="예: 60만원 또는 56만원 ~ 72만원">
+                </label>
+                <label class="quote-wide">
+                  견적 내용
+                  <textarea id="quoteMemoInput" placeholder="견적서에 넣을 작업 범위, 특이사항, 포함/제외 항목을 수정할 수 있습니다."></textarea>
+                </label>
+              </div>
               <label class="quote-upload">
                 도장 이미지
                 <input id="quoteStampInput" type="file" accept="image/png,image/jpeg,image/webp">
@@ -2004,9 +2150,13 @@
       var estimateNotesInput = document.getElementById("estimateNotes");
       var calculateEstimateBtn = document.getElementById("calculateEstimateBtn");
       var estimateResult = document.getElementById("estimateResult");
+      var quoteActions = document.getElementById("quoteActions");
       var makeQuoteBtn = document.getElementById("makeQuoteBtn");
       var printQuoteBtn = document.getElementById("printQuoteBtn");
       var quotePreview = document.getElementById("quotePreview");
+      var quoteTitleInput = document.getElementById("quoteTitleInput");
+      var quoteAmountInput = document.getElementById("quoteAmountInput");
+      var quoteMemoInput = document.getElementById("quoteMemoInput");
       var quoteStampInput = document.getElementById("quoteStampInput");
       var quoteSheet = document.getElementById("quoteSheet");
       var accountButton = document.getElementById("accountButton");
@@ -2126,7 +2276,10 @@
       });
       calculateEstimateBtn.addEventListener("click", renderEstimate);
       makeQuoteBtn.addEventListener("click", renderQuotePreview);
-      printQuoteBtn.addEventListener("click", function () { window.print(); });
+      printQuoteBtn.addEventListener("click", printQuote);
+      quoteTitleInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
+      quoteAmountInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
+      quoteMemoInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
       quoteStampInput.addEventListener("change", handleQuoteStampUpload);
       estimateTypeInput.addEventListener("change", function () {
         updateEstimateForm();
@@ -3193,6 +3346,7 @@
             state.profileStats = null;
             state.isAdmin = false;
             updateAdminMenu();
+            updateQuoteControls();
             renderLocalSavedNotes();
             updateAuthUi();
           }
@@ -3302,6 +3456,7 @@
           ? ""
           : "로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.";
         updateFieldRewardVisibility();
+        updateQuoteControls();
         renderAccountProfile();
       }
 
@@ -3355,6 +3510,21 @@
       function canSeeProviderTerms() {
         var profile = state.profile || {};
         return !!state.isAdmin || (profile.member_role === "provider" && profile.provider_status === "approved");
+      }
+
+      function canCreateQuoteDocument() {
+        var profile = state.profile || {};
+        return !!state.isAdmin || (profile.member_role === "provider" && profile.provider_status === "approved");
+      }
+
+      function updateQuoteControls() {
+        var allowed = canCreateQuoteDocument();
+        quoteActions.hidden = !allowed;
+        if (!allowed) {
+          quotePreview.hidden = true;
+          printQuoteBtn.hidden = true;
+        }
+        return allowed;
       }
 
       function updateFieldRewardVisibility() {
@@ -3418,6 +3588,7 @@
 
       function renderEstimate() {
         var estimate = calculateEstimate();
+        var canQuote = updateQuoteControls();
         if (!estimate.ok) {
           estimateResult.innerHTML = '<div class="note">' + esc(estimate.message) + '</div>';
           quotePreview.hidden = true;
@@ -3431,12 +3602,16 @@
           '<div class="estimate-lines">',
           estimate.lines.map(function (line) { return '<span>' + esc(line) + '</span>'; }).join(""),
           '<span>현장 상태, 작업 범위, 지역, 주차·엘리베이터 조건에 따라 최종 금액은 달라질 수 있습니다.</span>',
-          '</div>'
+          '</div>',
+          canQuote ? '<button class="secondary" id="makeQuoteInlineBtn" type="button">견적서 만들기</button>' : ''
         ].join("");
+        var inlineQuoteBtn = document.getElementById("makeQuoteInlineBtn");
+        if (inlineQuoteBtn) inlineQuoteBtn.addEventListener("click", renderQuotePreview);
         if (!quotePreview.hidden) renderQuotePreview();
       }
 
       function renderQuotePreview() {
+        if (!updateQuoteControls()) return;
         var estimate = calculateEstimate();
         if (!estimate.ok) {
           estimateResult.innerHTML = '<div class="note">' + esc(estimate.message) + '</div>';
@@ -3445,6 +3620,8 @@
           return;
         }
 
+        quoteAmountInput.placeholder = "예: " + formatWonRange(estimate.low, estimate.high);
+        if (!quoteMemoInput.value.trim()) quoteMemoInput.placeholder = estimate.lines.join("\n");
         quoteSheet.innerHTML = quoteHtml(estimate);
         quotePreview.hidden = false;
         printQuoteBtn.hidden = false;
@@ -3461,6 +3638,9 @@
         var manager = profile.display_name || "";
         var phone = profile.phone || "";
         var stamp = localStorage.getItem("estimateNoteQuoteStamp") || "";
+        var title = quoteTitleInput.value.trim() || "청소 견적서";
+        var amount = quoteAmountInput.value.trim() || formatWonRange(estimate.low, estimate.high);
+        var memo = quoteMemoInput.value.trim() || estimate.lines.join("\n");
         var details = [
           ["견적일", new Date().toLocaleDateString("ko-KR")],
           ["견적 업체", company],
@@ -3472,18 +3652,39 @@
           ["추가사항", estimateNotesInput.value.trim() || "-"]
         ];
         return [
-          '<h3>청소 견적서</h3>',
-          '<div class="quote-meta">',
-          details.map(function (row) { return '<div><strong>' + esc(row[0]) + '</strong> : ' + esc(row[1]) + '</div>'; }).join(""),
-          '</div>',
-          '<table class="quote-table"><thead><tr><th>항목</th><th>내용</th></tr></thead><tbody>',
-          estimate.lines.map(function (line) { return '<tr><td>산출 기준</td><td>' + esc(line) + '</td></tr>'; }).join(""),
+          '<div class="quote-head"><div class="quote-logo">h</div><div><h3>' + esc(title) + '</h3><div class="quote-subtitle">견적노트 · 행복한청소</div></div></div>',
+          '<table class="quote-table"><tbody>',
+          details.map(function (row) { return '<tr><th>' + esc(row[0]) + '</th><td>' + esc(row[1]) + '</td></tr>'; }).join(""),
           '</tbody></table>',
-          '<div class="quote-total"><span>예상 견적 금액</span><span>' + esc(formatWonRange(estimate.low, estimate.high)) + '</span></div>',
+          '<div class="quote-section"><strong>견적 내용</strong><div>' + esc(memo).replace(/\n/g, "<br>") + '</div></div>',
+          '<div class="quote-total"><span>견적 금액</span><span>' + esc(amount) + '</span></div>',
           '<div class="note">본 견적은 입력값 기준의 예상 견적이며, 현장 상태와 작업 범위 확인 후 최종 금액이 달라질 수 있습니다.</div>',
           '<div class="quote-stamp-row"><div><strong>' + esc(company) + '</strong><div>' + esc(manager || phone || "") + '</div></div><div class="quote-stamp">' + (stamp ? '<img src="' + escAttr(stamp) + '" alt="업체 도장">' : '<span>도장</span>') + '</div></div>'
         ].join("");
       }
+
+      function cleanupQuotePrint() {
+        var root = document.getElementById("quotePrintRoot");
+        if (root) root.remove();
+        document.body.classList.remove("printing-quote");
+      }
+
+      function printQuote() {
+        renderQuotePreview();
+        cleanupQuotePrint();
+        var root = document.createElement("div");
+        root.id = "quotePrintRoot";
+        root.className = "quote-sheet";
+        root.innerHTML = quoteSheet.innerHTML;
+        document.body.appendChild(root);
+        document.body.classList.add("printing-quote");
+        window.setTimeout(function () {
+          window.print();
+          window.setTimeout(cleanupQuotePrint, 1200);
+        }, 50);
+      }
+
+      window.addEventListener("afterprint", cleanupQuotePrint);
 
       function handleQuoteStampUpload() {
         var file = quoteStampInput.files && quoteStampInput.files[0];
@@ -3784,6 +3985,7 @@
           state.isAdmin = !!data.is_admin;
           updateAdminMenu();
           updateFieldRewardVisibility();
+          updateQuoteControls();
           fillProfileForm();
           profileForm.hidden = true;
           renderAccountProfile();
@@ -3819,6 +4021,7 @@
           state.isAdmin = !!data.is_admin;
           updateAdminMenu();
           updateFieldRewardVisibility();
+          updateQuoteControls();
           fillProfileForm();
           profileForm.hidden = true;
           renderAccountProfile();
