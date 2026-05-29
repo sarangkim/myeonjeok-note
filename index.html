@@ -530,8 +530,11 @@
 
     .top-ad-slot {
       display: block;
+      width: 100%;
+      max-width: 100%;
       min-height: 90px;
       margin: 12px 0;
+      overflow: hidden;
     }
 
     .top-ad-slot[hidden] {
@@ -541,7 +544,15 @@
     .top-ad-slot .adsbygoogle {
       display: block;
       width: 100%;
+      max-width: 100%;
       min-height: 90px;
+      overflow: hidden;
+    }
+
+    .top-ad-slot ins,
+    .top-ad-slot iframe {
+      max-width: 100% !important;
+      overflow: hidden !important;
     }
 
     .search-grid {
@@ -1492,6 +1503,11 @@
         font-size: 9.5pt !important;
       }
 
+      #quotePrintRoot * {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
       #quotePrintRoot .quote-head {
         padding-bottom: 5mm !important;
       }
@@ -2275,7 +2291,7 @@
         if (!protectNoteInput.checked) notePasswordInput.value = "";
       });
       calculateEstimateBtn.addEventListener("click", renderEstimate);
-      makeQuoteBtn.addEventListener("click", renderQuotePreview);
+      makeQuoteBtn.addEventListener("click", function () { renderQuotePreview(true); });
       printQuoteBtn.addEventListener("click", printQuote);
       quoteTitleInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
       quoteAmountInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
@@ -3555,9 +3571,10 @@
         boardPanel.hidden = !isBoard;
         adminProvidersPanel.hidden = !isAdminProviders;
         requestsPanel.hidden = isNotes || isEstimate || isBoard || isAdminProviders;
-        fieldCreateBlock.hidden = true;
+        fieldCreateBlock.hidden = isNotes || isBoard || isAdminProviders || view === "public" || view === "mine" || view === "applied";
 
         if (isEstimate) {
+          showFieldCreateMount(state.currentResult);
           syncEstimateArea(state.currentResult);
           renderEstimate();
         } else if (view === "public") {
@@ -3583,7 +3600,21 @@
 
       function estimateAreaFromResult(data) {
         var sum = data && data.sum ? data.sum : {};
-        return Number(sum.total_pyeong || sum.exclusive_pyeong || 0);
+        if (sum.total_pyeong || sum.exclusive_pyeong) return Number(sum.total_pyeong || sum.exclusive_pyeong || 0);
+        if (data && data.floor_exclusive_pyeong) return Number(data.floor_exclusive_pyeong || 0);
+        if (data && Array.isArray(data.floor_items) && data.floor_items.length) {
+          var floorTotal = data.floor_items.reduce(function (total, item) {
+            return total + Number(item.area_pyeong || 0);
+          }, 0);
+          return floorTotal ? round2(floorTotal) : 0;
+        }
+        if (data && Array.isArray(data.breakdown) && data.breakdown.length) {
+          var breakdownTotal = data.breakdown.reduce(function (total, item) {
+            return total + Number(item.area_pyeong || 0);
+          }, 0);
+          return breakdownTotal ? round2(breakdownTotal) : 0;
+        }
+        return 0;
       }
 
       function renderEstimate() {
@@ -3606,11 +3637,11 @@
           canQuote ? '<button class="secondary" id="makeQuoteInlineBtn" type="button">견적서 만들기</button>' : ''
         ].join("");
         var inlineQuoteBtn = document.getElementById("makeQuoteInlineBtn");
-        if (inlineQuoteBtn) inlineQuoteBtn.addEventListener("click", renderQuotePreview);
+        if (inlineQuoteBtn) inlineQuoteBtn.addEventListener("click", function () { renderQuotePreview(true); });
         if (!quotePreview.hidden) renderQuotePreview();
       }
 
-      function renderQuotePreview() {
+      function renderQuotePreview(shouldScroll) {
         if (!updateQuoteControls()) return;
         var estimate = calculateEstimate();
         if (!estimate.ok) {
@@ -3625,6 +3656,7 @@
         quoteSheet.innerHTML = quoteHtml(estimate);
         quotePreview.hidden = false;
         printQuoteBtn.hidden = false;
+        if (shouldScroll) quotePreview.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
 
       function quoteHtml(estimate) {
@@ -3671,20 +3703,30 @@
 
       function printQuote() {
         renderQuotePreview();
-        cleanupQuotePrint();
+        if (!canCreateQuoteDocument() || quotePreview.hidden) return;
+        var originalNodes = document.createDocumentFragment();
+        while (document.body.firstChild) {
+          originalNodes.appendChild(document.body.firstChild);
+        }
         var root = document.createElement("div");
         root.id = "quotePrintRoot";
         root.className = "quote-sheet";
         root.innerHTML = quoteSheet.innerHTML;
         document.body.appendChild(root);
         document.body.classList.add("printing-quote");
+        var restored = false;
+        function restore() {
+          if (restored) return;
+          restored = true;
+          cleanupQuotePrint();
+          document.body.appendChild(originalNodes);
+        }
+        window.addEventListener("afterprint", restore, { once: true });
         window.setTimeout(function () {
           window.print();
-          window.setTimeout(cleanupQuotePrint, 1200);
+          window.setTimeout(restore, 1500);
         }, 50);
       }
-
-      window.addEventListener("afterprint", cleanupQuotePrint);
 
       function handleQuoteStampUpload() {
         var file = quoteStampInput.files && quoteStampInput.files[0];
@@ -4237,7 +4279,7 @@
           public_area: fieldPublicAreaInput.value.trim(),
           cleaning_type: fieldCleaningTypeInput.value.trim(),
           space_type: fieldSpaceTypeInput.value.trim(),
-          area_pyeong: result.sum && result.sum.total_pyeong ? result.sum.total_pyeong : null,
+          area_pyeong: estimateAreaFromResult(result) || null,
           reward_text: canSeeProviderTerms() ? fieldRewardInput.value.trim() : "",
           preferred_date: fieldDateInput.value.trim(),
           description: fieldDescriptionInput.value.trim()
