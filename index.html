@@ -1291,6 +1291,119 @@
       line-height: 1.45;
     }
 
+    .quote-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .quote-preview {
+      display: grid;
+      gap: 12px;
+      border: 1px solid rgba(30, 111, 92, 0.18);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.72);
+      padding: 14px;
+    }
+
+    .quote-upload {
+      display: grid;
+      gap: 6px;
+    }
+
+    .quote-sheet {
+      display: grid;
+      gap: 16px;
+      border: 1px solid #d9ded8;
+      border-radius: 12px;
+      background: #fff;
+      color: #111;
+      padding: 22px;
+    }
+
+    .quote-sheet h3 {
+      margin: 0;
+      font-size: 26px;
+      text-align: center;
+    }
+
+    .quote-meta {
+      display: grid;
+      gap: 7px;
+      font-size: 13px;
+    }
+
+    .quote-table {
+      width: 100%;
+      min-width: 0;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .quote-table th,
+    .quote-table td {
+      white-space: normal;
+    }
+
+    .quote-total {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border: 2px solid var(--brand);
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .quote-stamp-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: end;
+      gap: 14px;
+      min-height: 96px;
+      text-align: right;
+    }
+
+    .quote-stamp {
+      display: grid;
+      place-items: center;
+      width: 96px;
+      height: 96px;
+      border: 1px dashed #cbd4ce;
+      border-radius: 50%;
+      color: var(--muted);
+      font-size: 12px;
+      overflow: hidden;
+    }
+
+    .quote-stamp img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+
+      #quoteSheet,
+      #quoteSheet * {
+        visibility: visible !important;
+      }
+
+      #quoteSheet {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 28px;
+      }
+    }
+
     .note-list {
       display: grid;
       gap: 8px;
@@ -1726,6 +1839,18 @@
             <div class="estimate-result" id="estimateResult">
               <div class="note">주소와 호실을 조회하면 면적이 자동으로 들어갑니다.</div>
             </div>
+            <div class="quote-actions">
+              <button class="secondary" id="makeQuoteBtn" type="button">견적서 만들기</button>
+              <button class="secondary" id="printQuoteBtn" type="button" hidden>인쇄/PDF 저장</button>
+            </div>
+            <div class="quote-preview" id="quotePreview" hidden>
+              <label class="quote-upload">
+                도장 이미지
+                <input id="quoteStampInput" type="file" accept="image/png,image/jpeg,image/webp">
+              </label>
+              <div class="note">도장 이미지는 이 브라우저에만 임시 저장됩니다. 권장 크기: 500KB 이하 PNG.</div>
+              <div class="quote-sheet" id="quoteSheet"></div>
+            </div>
           </div>
         </div>
 
@@ -1879,6 +2004,11 @@
       var estimateNotesInput = document.getElementById("estimateNotes");
       var calculateEstimateBtn = document.getElementById("calculateEstimateBtn");
       var estimateResult = document.getElementById("estimateResult");
+      var makeQuoteBtn = document.getElementById("makeQuoteBtn");
+      var printQuoteBtn = document.getElementById("printQuoteBtn");
+      var quotePreview = document.getElementById("quotePreview");
+      var quoteStampInput = document.getElementById("quoteStampInput");
+      var quoteSheet = document.getElementById("quoteSheet");
       var accountButton = document.getElementById("accountButton");
       var accountMenu = document.getElementById("accountMenu");
       var accountEmail = document.getElementById("accountEmail");
@@ -1995,6 +2125,9 @@
         if (!protectNoteInput.checked) notePasswordInput.value = "";
       });
       calculateEstimateBtn.addEventListener("click", renderEstimate);
+      makeQuoteBtn.addEventListener("click", renderQuotePreview);
+      printQuoteBtn.addEventListener("click", function () { window.print(); });
+      quoteStampInput.addEventListener("change", handleQuoteStampUpload);
       estimateTypeInput.addEventListener("change", function () {
         updateEstimateForm();
         renderEstimate();
@@ -3287,6 +3420,8 @@
         var estimate = calculateEstimate();
         if (!estimate.ok) {
           estimateResult.innerHTML = '<div class="note">' + esc(estimate.message) + '</div>';
+          quotePreview.hidden = true;
+          printQuoteBtn.hidden = true;
           return;
         }
 
@@ -3298,6 +3433,77 @@
           '<span>현장 상태, 작업 범위, 지역, 주차·엘리베이터 조건에 따라 최종 금액은 달라질 수 있습니다.</span>',
           '</div>'
         ].join("");
+        if (!quotePreview.hidden) renderQuotePreview();
+      }
+
+      function renderQuotePreview() {
+        var estimate = calculateEstimate();
+        if (!estimate.ok) {
+          estimateResult.innerHTML = '<div class="note">' + esc(estimate.message) + '</div>';
+          quotePreview.hidden = true;
+          printQuoteBtn.hidden = true;
+          return;
+        }
+
+        quoteSheet.innerHTML = quoteHtml(estimate);
+        quotePreview.hidden = false;
+        printQuoteBtn.hidden = false;
+      }
+
+      function quoteHtml(estimate) {
+        var profile = state.profile || {};
+        var result = state.currentResult || {};
+        var address = result.road || result.jibun || addressInput.value.trim() || "-";
+        var floor = result.input && result.input.floor ? result.input.floor : (floorSelect.value || "");
+        var ho = result.input && result.input.ho ? result.input.ho : (hoInput.value.trim() || "");
+        var area = estimateAreaInput.value || estimateAreaFromResult(result) || "";
+        var company = profile.company_name || "업체명";
+        var manager = profile.display_name || "";
+        var phone = profile.phone || "";
+        var stamp = localStorage.getItem("estimateNoteQuoteStamp") || "";
+        var details = [
+          ["견적일", new Date().toLocaleDateString("ko-KR")],
+          ["견적 업체", company],
+          ["담당자", manager || "-"],
+          ["연락처", phone || "-"],
+          ["현장 주소", [address, floor, ho].filter(Boolean).join(" / ")],
+          ["청소 종류", estimate.label],
+          ["면적", area ? area + "평" : "-"],
+          ["추가사항", estimateNotesInput.value.trim() || "-"]
+        ];
+        return [
+          '<h3>청소 견적서</h3>',
+          '<div class="quote-meta">',
+          details.map(function (row) { return '<div><strong>' + esc(row[0]) + '</strong> : ' + esc(row[1]) + '</div>'; }).join(""),
+          '</div>',
+          '<table class="quote-table"><thead><tr><th>항목</th><th>내용</th></tr></thead><tbody>',
+          estimate.lines.map(function (line) { return '<tr><td>산출 기준</td><td>' + esc(line) + '</td></tr>'; }).join(""),
+          '</tbody></table>',
+          '<div class="quote-total"><span>예상 견적 금액</span><span>' + esc(formatWonRange(estimate.low, estimate.high)) + '</span></div>',
+          '<div class="note">본 견적은 입력값 기준의 예상 견적이며, 현장 상태와 작업 범위 확인 후 최종 금액이 달라질 수 있습니다.</div>',
+          '<div class="quote-stamp-row"><div><strong>' + esc(company) + '</strong><div>' + esc(manager || phone || "") + '</div></div><div class="quote-stamp">' + (stamp ? '<img src="' + escAttr(stamp) + '" alt="업체 도장">' : '<span>도장</span>') + '</div></div>'
+        ].join("");
+      }
+
+      function handleQuoteStampUpload() {
+        var file = quoteStampInput.files && quoteStampInput.files[0];
+        if (!file) return;
+        if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+          estimateResult.innerHTML = '<div class="note">PNG, JPG, WebP 이미지만 사용할 수 있습니다.</div>';
+          quoteStampInput.value = "";
+          return;
+        }
+        if (file.size > 500 * 1024) {
+          estimateResult.innerHTML = '<div class="note">도장 이미지는 500KB 이하로 올려주세요.</div>';
+          quoteStampInput.value = "";
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+          localStorage.setItem("estimateNoteQuoteStamp", String(reader.result || ""));
+          renderQuotePreview();
+        };
+        reader.readAsDataURL(file);
       }
 
       function updateEstimateForm() {
