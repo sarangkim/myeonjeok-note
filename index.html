@@ -83,7 +83,8 @@
     }
 
     .app {
-      width: calc(100% - 40px);
+      width: calc(100vw - 40px) !important;
+      max-width: none !important;
       margin: 0 auto;
       padding: 28px 0 36px;
     }
@@ -1994,8 +1995,8 @@
               <textarea id="estimateNotes" placeholder="&#50696;: &#50648;&#47532;&#48288;&#51060;&#53552; &#50630;&#51020;, &#51452;&#52264; &#50612;&#47140;&#50880;, &#50976;&#47532;&#52285; &#47566;&#51020;, &#51089;&#50629; &#49884;&#44036; &#51228;&#54620; &#46321;"></textarea>
             </label>
             <button id="calculateEstimateBtn" type="button">견적 계산</button>
-            <div class="quote-actions" id="quoteActions" hidden>
-              <button class="secondary" id="makeQuoteBtn" type="button" hidden>견적서 만들기</button>
+            <div class="quote-actions" id="quoteActions">
+              <button class="secondary" id="makeQuoteBtn" type="button">견적서 만들기</button>
               <button class="secondary" id="printQuoteBtn" type="button" hidden>인쇄/PDF 저장</button>
             </div>
             <div class="estimate-result" id="estimateResult">
@@ -3553,7 +3554,8 @@
 
       function updateQuoteControls() {
         var allowed = canCreateQuoteDocument();
-        quoteActions.hidden = !allowed;
+        quoteActions.hidden = false;
+        makeQuoteBtn.hidden = false;
         if (!allowed) {
           quotePreview.hidden = true;
           printQuoteBtn.hidden = true;
@@ -3643,7 +3645,7 @@
         if (!estimateAreaInput.value.trim()) syncEstimateArea(state.currentResult);
         var estimate = calculateEstimate();
         if (estimate.ok && !estimateAreaInput.value.trim()) syncEstimateArea(state.currentResult);
-        var canQuote = updateQuoteControls();
+        updateQuoteControls();
         if (!estimate.ok) {
           estimateResult.innerHTML = '<div class="note">' + esc(estimate.message) + '</div>';
           quotePreview.hidden = true;
@@ -3657,17 +3659,14 @@
           '<div class="estimate-lines">',
           estimate.lines.map(function (line) { return '<span>' + esc(line) + '</span>'; }).join(""),
           '<span>현장 상태, 작업 범위, 지역, 주차·엘리베이터 조건에 따라 최종 금액은 달라질 수 있습니다.</span>',
-          '</div>',
-          '<button class="secondary" id="makeQuoteInlineBtn" type="button">견적서 만들기</button>'
+          '</div>'
         ].join("");
-        var inlineQuoteBtn = document.getElementById("makeQuoteInlineBtn");
-        if (inlineQuoteBtn) inlineQuoteBtn.addEventListener("click", function () { renderQuotePreview(true); });
         if (!quotePreview.hidden) renderQuotePreview();
       }
 
       function renderQuotePreview(shouldScroll) {
         if (!updateQuoteControls()) {
-          estimateResult.innerHTML += '<div class="note">견적서 만들기는 청소업체 계정 또는 관리자 계정에서 사용할 수 있습니다.</div>';
+          estimateResult.innerHTML = '<div class="note">견적서 만들기는 청소업체 계정 또는 관리자 계정에서 사용할 수 있습니다.</div>';
           return;
         }
         var estimate = calculateEstimate();
