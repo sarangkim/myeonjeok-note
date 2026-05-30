@@ -1,6 +1,11 @@
 const PROFILES_TABLE = "user_profiles";
 const APPLICATIONS_TABLE = "field_request_applications";
 const REQUESTS_TABLE = "field_requests";
+const DEFAULT_ADMIN_EMAILS = [
+  "77happycleaning@gmail.com",
+  "onlyghjr@gmail.com",
+  "contact@happycleaning.co.kr",
+];
 
 const BASE_PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,bio,created_at,updated_at";
 const PROFILE_COLUMNS = `${BASE_PROFILE_COLUMNS},member_role,provider_status,provider_requested_at,provider_approved_at,provider_penalty_count,provider_suspended_at`;
@@ -133,7 +138,7 @@ function envList(name) {
 
 function isAdminUser(user) {
   if (!user) return false;
-  const emails = [...envList("ADMIN_EMAILS"), ...envList("BOARD_ADMIN_EMAILS")];
+  const emails = [...DEFAULT_ADMIN_EMAILS, ...envList("ADMIN_EMAILS"), ...envList("BOARD_ADMIN_EMAILS")];
   const email = String(user.email || "").trim().toLowerCase();
   return !!email && emails.includes(email);
 }

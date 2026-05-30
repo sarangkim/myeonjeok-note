@@ -1143,7 +1143,9 @@
     }
 
     table td.pyeong-cell,
+    .table-wrap table td.pyeong-cell,
     .table-wrap .pyeong-cell,
+    .estimate-form #estimateArea.has-estimate-area,
     .estimate-form #estimateArea:not(:placeholder-shown) {
       color: #d92f72 !important;
       font-weight: 950 !important;
@@ -2235,6 +2237,7 @@
       var createBoardPostBtn = document.getElementById("createBoardPostBtn");
       var boardStatus = document.getElementById("boardStatus");
       var boardList = document.getElementById("boardList");
+      var defaultAdminEmails = ["77happycleaning@gmail.com", "onlyghjr@gmail.com", "contact@happycleaning.co.kr"];
 
       var state = {
         floors: [],
@@ -3464,6 +3467,7 @@
         var label = user ? (user.email || user.id || "") : "";
         var initial = label ? label.slice(0, 1).toUpperCase() : "?";
         var notificationCount = user && state.profileStats ? Number(state.profileStats.notification_count || 0) : 0;
+        if (user && defaultAdminEmails.indexOf(String(user.email || "").trim().toLowerCase()) !== -1) state.isAdmin = true;
 
         renderAccountButton(initial, state.profile && state.profile.avatar_url, notificationCount);
         accountEmail.textContent = user ? "내 계정" : "로그인이 필요합니다";
@@ -3541,7 +3545,9 @@
 
       function canCreateQuoteDocument() {
         var profile = state.profile || {};
-        return !!state.isAdmin || (profile.member_role === "provider" && profile.provider_status === "approved");
+        var user = state.authSession && state.authSession.user;
+        var email = String(user && user.email || "").trim().toLowerCase();
+        return !!state.isAdmin || defaultAdminEmails.indexOf(email) !== -1 || profile.member_role === "provider";
       }
 
       function updateQuoteControls() {
@@ -3608,6 +3614,7 @@
         var area = estimateAreaFromResult(data);
         if (area) {
           estimateAreaInput.value = fmt(area);
+          estimateAreaInput.classList.add("has-estimate-area");
           estimateAreaInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
       }
@@ -3634,6 +3641,7 @@
       function renderEstimate() {
         if (!estimateAreaInput.value.trim()) syncEstimateArea(state.currentResult);
         var estimate = calculateEstimate();
+        if (estimate.ok && !estimateAreaInput.value.trim()) syncEstimateArea(state.currentResult);
         var canQuote = updateQuoteControls();
         if (!estimate.ok) {
           estimateResult.innerHTML = '<div class="note">' + esc(estimate.message) + '</div>';
