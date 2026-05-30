@@ -3698,6 +3698,7 @@
         var stamp = localStorage.getItem("estimateNoteQuoteStamp") || "";
         var title = quoteTitleInput.value.trim() || "청소 견적서";
         var amount = quoteAmountInput.value.trim() || formatWonRange(estimate.low, estimate.high);
+        var amountText = /부가세|VAT/i.test(amount) ? amount : amount + " (부가세 별도)";
         var memo = quoteMemoInput.value.trim() || estimate.lines.join("\n");
         var details = [
           ["견적일", new Date().toLocaleDateString("ko-KR")],
@@ -3715,8 +3716,8 @@
           details.map(function (row) { return '<tr><th>' + esc(row[0]) + '</th><td>' + esc(row[1]) + '</td></tr>'; }).join(""),
           '</tbody></table>',
           '<div class="quote-section"><strong>견적 내용</strong><div>' + esc(memo).replace(/\n/g, "<br>") + '</div></div>',
-          '<div class="quote-total"><span>견적 금액</span><span>' + esc(amount) + '</span></div>',
-          '<div class="note">본 견적은 입력값 기준의 예상 견적이며, 현장 상태와 작업 범위 확인 후 최종 금액이 달라질 수 있습니다.</div>',
+          '<div class="quote-total"><span>견적 금액</span><span>' + esc(amountText) + '</span></div>',
+          '<div class="note">본 견적은 입력값 기준의 예상 견적이며, 현장 상태와 작업 범위 확인 후 최종 금액이 달라질 수 있습니다. 상기 금액은 부가세 별도입니다.</div>',
           '<div class="quote-stamp-row"><div><strong>' + esc(company) + '</strong><div>' + esc(manager || phone || "") + '</div></div><div class="quote-stamp">' + (stamp ? '<img src="' + escAttr(stamp) + '" alt="업체 도장">' : '<span>도장</span>') + '</div></div>'
         ].join("");
       }
@@ -3730,6 +3731,7 @@
       function printQuote() {
         renderQuotePreview();
         if (!canCreateQuoteDocument() || quotePreview.hidden) return;
+        window.alert("PDF 저장 화면에서 '머리글과 바닥글' 체크를 꺼주세요.\n체크되어 있으면 날짜, 사이트 제목, URL, 페이지 번호가 함께 표시됩니다.");
         cleanupQuotePrint();
         var wrapper = document.createElement("div");
         wrapper.innerHTML = quoteSheet.outerHTML.replace('id="quoteSheet"', 'id="quotePrintRoot"');
