@@ -83,7 +83,7 @@
     }
 
     .app {
-      width: min(1120px, calc(100% - 28px));
+      width: min(1440px, calc(100% - 40px));
       margin: 0 auto;
       padding: 28px 0 36px;
     }
@@ -651,7 +651,7 @@
     }
 
     .workspace {
-      --side-panel-width: 360px;
+      --side-panel-width: 420px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) 12px var(--side-panel-width);
       gap: 8px;
@@ -680,32 +680,32 @@
       top: 14px;
       align-self: stretch;
       min-height: 220px;
-      border: 0;
+      border: 1px solid rgba(30, 111, 92, 0.22);
       border-radius: 999px;
-      background: transparent;
+      background: rgba(255, 255, 255, 0.72);
       cursor: col-resize;
       padding: 0;
-      box-shadow: none;
+      box-shadow: 0 10px 24px rgba(30, 111, 92, 0.16);
       touch-action: none;
     }
 
     .workspace-resizer::before {
       content: "";
       display: block;
-      width: 4px;
+      width: 6px;
       height: 100%;
       min-height: 220px;
       margin: 0 auto;
       border-radius: 999px;
-      background: rgba(30, 111, 92, 0.14);
+      background: linear-gradient(180deg, rgba(30, 111, 92, 0.22), rgba(30, 111, 92, 0.62), rgba(30, 111, 92, 0.22));
       transition: background 0.16s ease, width 0.16s ease;
     }
 
     .workspace-resizer:hover,
     .workspace-resizer:focus-visible,
     body.resizing-workspace .workspace-resizer {
-      background: transparent;
-      box-shadow: none;
+      background: rgba(229, 242, 238, 0.92);
+      box-shadow: 0 14px 30px rgba(30, 111, 92, 0.22);
       transform: none;
     }
 
@@ -1145,9 +1145,10 @@
     table td.pyeong-cell,
     .table-wrap table td.pyeong-cell,
     .table-wrap .pyeong-cell,
+    .table-wrap tbody tr td:last-child,
     .estimate-form #estimateArea.has-estimate-area,
     .estimate-form #estimateArea:not(:placeholder-shown) {
-      color: #d92f72 !important;
+      color: #e6005c !important;
       font-weight: 950 !important;
     }
 
@@ -2237,7 +2238,7 @@
       var createBoardPostBtn = document.getElementById("createBoardPostBtn");
       var boardStatus = document.getElementById("boardStatus");
       var boardList = document.getElementById("boardList");
-      var defaultAdminEmails = ["77happycleaning@gmail.com", "onlyghjr@gmail.com", "contact@happycleaning.co.kr"];
+      var defaultAdminEmails = ["77happycleaning@gmail.com", "hangstore77@gmail.com", "onlyghjr@gmail.com", "contact@happycleaning.co.kr"];
 
       var state = {
         floors: [],
@@ -3547,7 +3548,7 @@
         var profile = state.profile || {};
         var user = state.authSession && state.authSession.user;
         var email = String(user && user.email || "").trim().toLowerCase();
-        return !!state.isAdmin || defaultAdminEmails.indexOf(email) !== -1 || profile.member_role === "provider";
+      return !!state.isAdmin || defaultAdminEmails.indexOf(email) !== -1 || profile.member_role === "provider";
       }
 
       function updateQuoteControls() {
@@ -3657,7 +3658,7 @@
           estimate.lines.map(function (line) { return '<span>' + esc(line) + '</span>'; }).join(""),
           '<span>현장 상태, 작업 범위, 지역, 주차·엘리베이터 조건에 따라 최종 금액은 달라질 수 있습니다.</span>',
           '</div>',
-          canQuote ? '<button class="secondary" id="makeQuoteInlineBtn" type="button">견적서 만들기</button>' : ''
+          '<button class="secondary" id="makeQuoteInlineBtn" type="button">견적서 만들기</button>'
         ].join("");
         var inlineQuoteBtn = document.getElementById("makeQuoteInlineBtn");
         if (inlineQuoteBtn) inlineQuoteBtn.addEventListener("click", function () { renderQuotePreview(true); });
@@ -3665,7 +3666,10 @@
       }
 
       function renderQuotePreview(shouldScroll) {
-        if (!updateQuoteControls()) return;
+        if (!updateQuoteControls()) {
+          estimateResult.innerHTML += '<div class="note">견적서 만들기는 청소업체 계정 또는 관리자 계정에서 사용할 수 있습니다.</div>';
+          return;
+        }
         var estimate = calculateEstimate();
         if (!estimate.ok) {
           estimateResult.innerHTML = '<div class="note">' + esc(estimate.message) + '</div>';

@@ -3,6 +3,7 @@ const APPLICATIONS_TABLE = "field_request_applications";
 const REQUESTS_TABLE = "field_requests";
 const DEFAULT_ADMIN_EMAILS = [
   "77happycleaning@gmail.com",
+  "hangstore77@gmail.com",
   "onlyghjr@gmail.com",
   "contact@happycleaning.co.kr",
 ];
