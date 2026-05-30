@@ -1486,7 +1486,7 @@
     @media print {
       @page {
         size: A4 portrait;
-        margin: 10mm;
+        margin: 7mm;
       }
 
       html,
@@ -1496,14 +1496,18 @@
         background: #fff !important;
       }
 
+      body.printing-quote * {
+        visibility: hidden !important;
+      }
+
       body.printing-quote > :not(#quotePrintRoot) {
         display: none !important;
       }
 
       #quotePrintRoot {
         display: grid !important;
-        gap: 7mm !important;
-        width: 190mm !important;
+        gap: 4mm !important;
+        width: 196mm !important;
         min-height: auto !important;
         margin: 0 auto !important;
         border: 0 !important;
@@ -1511,55 +1515,58 @@
         box-shadow: none;
         padding: 0 !important;
         color: #111 !important;
-        font-size: 9.5pt !important;
+        font-size: 8.8pt !important;
+        line-height: 1.38 !important;
+        visibility: visible !important;
       }
 
       #quotePrintRoot * {
         break-inside: avoid !important;
         page-break-inside: avoid !important;
+        visibility: visible !important;
       }
 
       #quotePrintRoot .quote-head {
-        padding-bottom: 5mm !important;
+        padding-bottom: 3mm !important;
       }
 
       #quotePrintRoot .quote-logo {
-        width: 18mm !important;
-        height: 18mm !important;
-        border-radius: 5mm !important;
-        font-size: 24pt !important;
+        width: 14mm !important;
+        height: 14mm !important;
+        border-radius: 4mm !important;
+        font-size: 18pt !important;
         box-shadow: none !important;
       }
 
       #quotePrintRoot h3 {
-        font-size: 21pt !important;
+        font-size: 18pt !important;
       }
 
       #quotePrintRoot .quote-table {
-        font-size: 9.5pt !important;
+        font-size: 8.8pt !important;
       }
 
       #quotePrintRoot .quote-table th,
       #quotePrintRoot .quote-table td {
-        padding: 2.8mm 2mm !important;
+        padding: 1.8mm 1.6mm !important;
       }
 
       #quotePrintRoot .quote-section {
-        padding: 4mm !important;
+        padding: 3mm !important;
       }
 
       #quotePrintRoot .quote-total {
-        padding: 5mm !important;
-        font-size: 15pt !important;
+        padding: 3mm !important;
+        font-size: 13pt !important;
       }
 
       #quotePrintRoot .quote-stamp-row {
-        min-height: 22mm !important;
+        min-height: 16mm !important;
       }
 
       #quotePrintRoot .quote-stamp {
-        width: 24mm !important;
-        height: 24mm !important;
+        width: 18mm !important;
+        height: 18mm !important;
       }
     }
 
@@ -1706,6 +1713,99 @@
     }
 
     @media (max-width: 860px) {
+      .app {
+        width: min(100% - 20px, 430px) !important;
+        padding-top: 16px;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: start;
+        gap: 8px;
+        margin-inline: 0;
+        padding: 12px;
+      }
+
+      .brand {
+        min-width: 0;
+        gap: 8px;
+      }
+
+      .brand-logo {
+        flex: 0 0 42px;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+      }
+
+      .brand-logo::before {
+        inset: 6px;
+        border-radius: 10px;
+      }
+
+      .brand-logo-mark {
+        font-size: 21px;
+      }
+
+      .brand-logo-spark {
+        right: 7px;
+        top: 7px;
+        width: 7px;
+        height: 7px;
+      }
+
+      .brand-copy {
+        min-width: 0;
+      }
+
+      .brand h1 {
+        font-size: clamp(24px, 8vw, 34px);
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .brand span {
+        max-width: 17em;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .main-nav {
+        margin-left: 0;
+      }
+
+      .menu-button {
+        width: 42px;
+        height: 42px;
+      }
+
+      .main-menu {
+        position: fixed;
+        top: 78px;
+        left: 10px;
+        right: 10px;
+        width: auto;
+        max-width: none;
+      }
+
+      .top-actions {
+        gap: 6px;
+      }
+
+      .install-button {
+        min-height: 42px;
+        padding: 0 12px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .account-button {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+      }
+
       .actions {
         align-items: stretch;
         flex-direction: column;
@@ -1713,10 +1813,6 @@
 
       .status {
         text-align: left;
-      }
-
-      .topbar {
-        align-items: flex-start;
       }
 
       .badge {
@@ -1752,6 +1848,30 @@
         position: static;
       }
     }
+
+    @media (max-width: 374px) {
+      .app {
+        width: calc(100% - 12px) !important;
+      }
+
+      .topbar {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .top-actions {
+        grid-column: 1 / -1;
+        justify-content: end;
+      }
+
+      .brand h1 {
+        font-size: 24px;
+      }
+
+      .brand span {
+        max-width: 15em;
+        font-size: 12px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1781,7 +1901,7 @@
       </nav>
 
       <div class="top-actions">
-        <button class="secondary install-button" id="installAppBtn" type="button" hidden>바로가기 추가</button>
+        <button class="secondary install-button" id="installAppBtn" type="button" hidden>앱 추가</button>
         <button class="account-button" id="accountButton" type="button" aria-label="계정 메뉴" aria-expanded="false">?</button>
         <div class="account-menu" id="accountMenu" hidden>
           <div class="account-email" id="accountEmail">로그인 필요</div>
@@ -2503,10 +2623,10 @@
           return;
         }
         if (isIosSafari()) {
-          setStatus("?? ??? ?? ? '? ??? ??'? ???? ????? ?? ? ????.", "warn");
+          setStatus("아이폰에서는 공유 버튼을 누른 뒤 '홈 화면에 추가'를 선택해주세요.", "warn");
           return;
         }
-        setStatus("???? ???? '? ??' ?? '? ??? ??'? ??????.", "warn");
+        setStatus("브라우저 메뉴에서 '앱 설치' 또는 '홈 화면에 추가'를 선택해주세요.", "warn");
       }
 
       function isStandaloneApp() {
