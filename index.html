@@ -1142,6 +1142,13 @@
       font-weight: 950;
     }
 
+    table td.pyeong-cell,
+    .table-wrap .pyeong-cell,
+    .estimate-form #estimateArea:not(:placeholder-shown) {
+      color: #d92f72 !important;
+      font-weight: 950 !important;
+    }
+
     .board-status {
       border: 1px solid rgba(30, 111, 92, 0.18);
       border-radius: 12px;
@@ -1985,7 +1992,7 @@
             </label>
             <button id="calculateEstimateBtn" type="button">견적 계산</button>
             <div class="quote-actions" id="quoteActions" hidden>
-              <button class="secondary" id="makeQuoteBtn" type="button">견적서 만들기</button>
+              <button class="secondary" id="makeQuoteBtn" type="button" hidden>견적서 만들기</button>
               <button class="secondary" id="printQuoteBtn" type="button" hidden>인쇄/PDF 저장</button>
             </div>
             <div class="estimate-result" id="estimateResult">
@@ -2755,6 +2762,9 @@
           return Number(a) - Number(b);
         });
         var floorExclusive = findFloorExclusiveFromItems(all.pub_items || [], floor);
+        var floorTotalM2 = round2(floorItems.reduce(function (total, item) {
+          return total + toNumber(item.area);
+        }, 0));
         return {
           ok: true,
           build: base.build,
@@ -2764,6 +2774,7 @@
           jibun: base.jibun || "",
           keys: base.keys || {},
           floor_items: floorItems.map(toClientFloorItem),
+          sum: floorExclusive ? areaSummary(floorExclusive.m2, null) : (floorTotalM2 ? areaSummary(floorTotalM2, null) : null),
           ho_list: hoList,
           ho_list_note: hoList.length ? "" : "해당 층에서 호 목록을 찾지 못했습니다.",
           ho_index: hoIndex,
@@ -3595,7 +3606,10 @@
 
       function syncEstimateArea(data) {
         var area = estimateAreaFromResult(data);
-        if (area) estimateAreaInput.value = area;
+        if (area) {
+          estimateAreaInput.value = fmt(area);
+          estimateAreaInput.dispatchEvent(new Event("input", { bubbles: true }));
+        }
       }
 
       function estimateAreaFromResult(data) {
@@ -3618,6 +3632,7 @@
       }
 
       function renderEstimate() {
+        if (!estimateAreaInput.value.trim()) syncEstimateArea(state.currentResult);
         var estimate = calculateEstimate();
         var canQuote = updateQuoteControls();
         if (!estimate.ok) {
@@ -3704,28 +3719,35 @@
       function printQuote() {
         renderQuotePreview();
         if (!canCreateQuoteDocument() || quotePreview.hidden) return;
-        var originalNodes = document.createDocumentFragment();
-        while (document.body.firstChild) {
-          originalNodes.appendChild(document.body.firstChild);
-        }
-        var root = document.createElement("div");
-        root.id = "quotePrintRoot";
-        root.className = "quote-sheet";
-        root.innerHTML = quoteSheet.innerHTML;
-        document.body.appendChild(root);
-        document.body.classList.add("printing-quote");
-        var restored = false;
-        function restore() {
-          if (restored) return;
-          restored = true;
-          cleanupQuotePrint();
-          document.body.appendChild(originalNodes);
-        }
-        window.addEventListener("afterprint", restore, { once: true });
-        window.setTimeout(function () {
+        var printWindow = window.open("", "_blank", "noopener,noreferrer,width=900,height=1200");
+        if (!printWindow) {
           window.print();
-          window.setTimeout(restore, 1500);
-        }, 50);
+          return;
+        }
+        var quoteMarkup = quoteSheet.outerHTML.replace('id="quoteSheet"', 'id="quotePrintRoot"');
+        printWindow.document.open();
+        printWindow.document.write([
+          '<!doctype html><html lang="ko"><head><meta charset="utf-8">',
+          '<meta name="viewport" content="width=device-width, initial-scale=1">',
+          '<title>견적서</title>',
+          '<style>',
+          '@page{size:A4 portrait;margin:10mm;}',
+          '*{box-sizing:border-box;}body{margin:0;background:#fff;color:#111;font-family:Arial,"Noto Sans KR",sans-serif;}',
+          '#quotePrintRoot{display:grid;gap:7mm;width:190mm;margin:0 auto;padding:0;border:0;box-shadow:none;font-size:9.5pt;}',
+          '#quotePrintRoot *{break-inside:avoid;page-break-inside:avoid;}',
+          '.quote-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #17352e;padding-bottom:5mm;}',
+          '.quote-logo{display:grid;place-items:center;width:18mm;height:18mm;border-radius:5mm;background:linear-gradient(135deg,#1f7a68,#f4c95d);color:#fff;font-size:24pt;font-weight:900;}',
+          'h3{margin:0;font-size:21pt;text-align:left;}.quote-subtitle{color:#596861;font-size:10pt;font-weight:800;}',
+          '.quote-table{width:100%;border-collapse:collapse;font-size:9.5pt;}.quote-table th,.quote-table td{border-bottom:1px solid #e5ebe7;padding:2.8mm 2mm;text-align:left;vertical-align:top;white-space:normal;}',
+          '.quote-section{border:1px solid #dce5df;border-radius:4mm;padding:4mm;line-height:1.55;}',
+          '.quote-total{display:flex;justify-content:space-between;gap:12px;border:2px solid #1e6f5c;border-radius:4mm;padding:5mm;font-size:15pt;font-weight:900;}',
+          '.note{color:#596861;font-size:9pt;}.quote-stamp-row{display:flex;justify-content:flex-end;align-items:end;gap:14px;min-height:22mm;text-align:right;}',
+          '.quote-stamp{display:grid;place-items:center;width:24mm;height:24mm;border:1px dashed #cbd4ce;border-radius:50%;color:#596861;font-size:9pt;overflow:hidden;}.quote-stamp img{width:100%;height:100%;object-fit:contain;}',
+          '</style></head><body>', quoteMarkup,
+          '<script>window.onload=function(){setTimeout(function(){window.print();},80)};window.onafterprint=function(){setTimeout(function(){window.close();},200)};<\/script>',
+          '</body></html>'
+        ].join(""));
+        printWindow.document.close();
       }
 
       function handleQuoteStampUpload() {
