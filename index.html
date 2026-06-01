@@ -333,7 +333,7 @@
     .account-button:hover,
     .account-button[aria-expanded="true"] {
       border-color: var(--brand);
-      background: #e5f2ee;
+      background: #eaf8ff;
     }
 
     .account-menu {
@@ -385,7 +385,7 @@
       height: 40px;
       border: 1px solid var(--line);
       border-radius: 50%;
-      background: #e5f2ee;
+      background: linear-gradient(135deg, #26b7e8, #0878b8);
       color: var(--brand-strong);
       font-size: 13px;
       font-weight: 850;
@@ -764,10 +764,12 @@
     .note-panel {
       display: grid;
       gap: 12px;
+      min-width: 0;
     }
 
     .section,
     .note-panel {
+      min-width: 0;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
@@ -872,6 +874,7 @@
     }
 
     .table-wrap {
+      min-width: 0;
       overflow-x: auto;
       border: 1px solid var(--line);
       border-radius: 6px;
@@ -1074,7 +1077,7 @@
     }
 
     .account-button {
-      background: linear-gradient(135deg, #1e7c67, #ef4b86);
+      background: linear-gradient(135deg, #35c5f2, #0878b8);
       color: #fff;
       font-size: 18px;
       font-weight: 900;
@@ -1108,7 +1111,7 @@
       width: 48px;
       height: 48px;
       border-color: rgba(255, 255, 255, 0.8);
-      background: linear-gradient(135deg, #1e7c67, #ef4b86);
+      background: linear-gradient(135deg, #35c5f2, #0878b8);
       color: #fff;
       font-size: 18px;
       box-shadow: 0 10px 22px rgba(31, 75, 63, 0.18);
@@ -1415,7 +1418,7 @@
       width: 64px;
       height: 64px;
       border-radius: 18px;
-      background: linear-gradient(135deg, #1f7a68, #f4c95d);
+      background: linear-gradient(135deg, #35c5f2, #0878b8);
       color: #fff;
       font-size: 34px;
       font-weight: 900;
@@ -1740,7 +1743,7 @@
       text-decoration: none;
     }
 
-    @media (min-width: 641px) and (max-width: 1100px) {
+    @media (min-width: 761px) and (max-width: 1100px) {
       .app {
         width: calc(100vw - 28px) !important;
       }
@@ -1754,7 +1757,7 @@
       }
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 760px) {
       .app {
         width: min(100% - 20px, 430px) !important;
         padding-top: 16px;
@@ -1866,6 +1869,16 @@
       .meta-grid,
       .sum-grid {
         grid-template-columns: 1fr;
+      }
+
+      .search-panel,
+      .top-ad-slot,
+      .workspace,
+      .results,
+      .results .section,
+      .note-panel {
+        width: 100%;
+        max-width: 100%;
       }
 
       .workspace-resizer {
@@ -2832,7 +2845,7 @@
         }
 
         workspaceResizer.addEventListener("pointerdown", function (event) {
-          if (window.matchMedia("(max-width: 640px)").matches) return;
+          if (window.matchMedia("(max-width: 760px)").matches) return;
           active = true;
           document.body.classList.add("resizing-workspace");
           workspaceResizer.setPointerCapture(event.pointerId);
@@ -3766,7 +3779,6 @@
         fieldCreateBlock.hidden = isNotes || isBoard || isAdminProviders || view === "public" || view === "mine" || view === "applied";
 
         if (isEstimate) {
-          showFieldCreateMount(state.currentResult);
           syncEstimateArea(state.currentResult);
           renderEstimate();
         } else if (view === "public") {
