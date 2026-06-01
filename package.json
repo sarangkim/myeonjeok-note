@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vercel dev",
     "dev:local": "node scripts/dev-local.js",
-    "check": "node --check api/area.js"
+    "check": "node --check api/area.js",
+    "visual:check": "node scripts/visual-check.js"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "vercel": "^37.0.0"
   }
 }

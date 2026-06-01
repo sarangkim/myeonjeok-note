@@ -1,8 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="116" fill="#f7f7f4"/>
-  <rect x="78" y="78" width="356" height="356" rx="96" fill="#ffffff"/>
-  <path d="M155 140c70-42 158-27 209 32 44 51 51 124 14 183-33 53-93 80-151 67-69-15-116-74-117-144-1-57 27-108 45-138z" fill="#1e6f5c"/>
-  <path d="M287 105c53 21 93 65 108 119 16 59 0 123-42 166-43 45-106 61-164 42 60-41 90-99 91-172 0-55 3-105 7-155z" fill="#f2c46b"/>
-  <path d="M190 364c59-32 91-77 96-137 4-44 7-83 10-116 19 10 36 23 51 40-18 66-17 122 5 169-29 44-89 66-162 44z" fill="#2b9578"/>
-  <circle cx="355" cy="132" r="28" fill="#ffffff" opacity=".88"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="견적노트">
+  <defs>
+    <linearGradient id="sky" x1="128" y1="70" x2="390" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#64d8ff"/>
+      <stop offset=".55" stop-color="#28b9e9"/>
+      <stop offset="1" stop-color="#1299d7"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="262" y1="246" x2="410" y2="405" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eaf8ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#f4fbff"/>
+  <path d="M257 62c48 75 112 130 112 219 0 92-70 166-156 166S58 375 58 284c0-69 48-123 95-180 19-23 34-48 46-74 18-39 34-41 58 32z" fill="url(#sky)"/>
+  <path d="M114 86l16 36 36 16-36 16-16 36-16-36-36-16 36-16 16-36zM190 42l11 25 25 11-25 11-11 25-11-25-25-11 25-11 11-25z" fill="#38c8f4"/>
+  <path d="M167 251a50 50 0 0 1 100 0h-32a18 18 0 0 0-36 0h-32z" fill="#ffffff" opacity=".92"/>
+  <path d="M265 262h135c21 0 38 17 38 38v111H227V300c0-21 17-38 38-38z" fill="url(#paper)"/>
+  <path d="M242 330h206" stroke="#1299d7" stroke-width="16" stroke-linecap="round"/>
+  <path d="M290 348v75M350 348v75M410 348v75" stroke="#1299d7" stroke-width="13" stroke-linecap="round"/>
+  <path d="M354 207l62 110h-124l62-110z" fill="#38c8f4"/>
 </svg>
