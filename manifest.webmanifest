@@ -5,8 +5,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f7f7f4",
-  "theme_color": "#1e6f5c",
+  "background_color": "#f5fbff",
+  "theme_color": "#26b7e8",
   "icons": [
     {
       "src": "/icons/estimate-note.svg",
