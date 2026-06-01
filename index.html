@@ -696,6 +696,7 @@
     }
 
     .workspace.no-results .note-panel {
+      display: none;
       position: static;
     }
 
@@ -2576,8 +2577,9 @@
           var adsense = data && data.adsense ? data.adsense : {};
           if (!response.ok || !adsense.client || !adsense.topSlot) return;
 
-          topAdSlot.hidden = false;
           topAdSlot.innerHTML = '<ins class="adsbygoogle" data-ad-client="' + escAttr(adsense.client) + '" data-ad-slot="' + escAttr(adsense.topSlot) + '" data-ad-format="auto" data-full-width-responsive="true"></ins>';
+          topAdSlot.dataset.loaded = "true";
+          updateAdVisibility();
           await loadAdsenseScript(adsense.client);
           window.adsbygoogle = window.adsbygoogle || [];
           window.adsbygoogle.push({});
@@ -2714,6 +2716,7 @@
           renderFloor(data);
           remember(data, "층");
           setCurrentResult(data);
+          selectSideView("estimate");
           prefillFieldRequest(data);
           renderMap(data);
           setStatus("층 정보를 불러왔습니다.");
@@ -2755,6 +2758,7 @@
           else renderFallback(data);
           remember(data, ho ? "호" : "층");
           setCurrentResult(data);
+          selectSideView("estimate");
           prefillFieldRequest(data);
           renderMap(data);
           setStatus("조회가 완료되었습니다.");
@@ -2796,7 +2800,14 @@
       function updateWorkspaceLayout() {
         var hasResults = !!(resultsEl && resultsEl.children.length);
         workspaceEl.classList.toggle("no-results", !hasResults);
+        updateAdVisibility();
         observeRevealCards();
+      }
+
+      function updateAdVisibility() {
+        if (!topAdSlot) return;
+        var hasResults = !!(resultsEl && resultsEl.children.length);
+        topAdSlot.hidden = !(hasResults && topAdSlot.dataset.loaded === "true");
       }
 
       function initWorkspaceResize() {
