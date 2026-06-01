@@ -2,6 +2,8 @@ const BUILD = "2026-05-11-MYEONJEOK-NOTE-01";
 const BLD_PAGE_SIZE = 100;
 const MAX_PAGES = 100;
 const PYEONG_M2 = 3.305785;
+const BLD_FETCH_TIMEOUT_MS = 8000;
+const BLD_FETCH_RETRIES = 1;
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -31,7 +33,13 @@ module.exports = async (req, res) => {
 
     const juso = await jusoLookup(address);
     const keys = keysFromJuso(juso);
-    const flrItems = await fetchBldItems("getBrFlrOulnInfo", keys);
+    let flrItems = [];
+    const warnings = [];
+    try {
+      flrItems = await fetchBldItems("getBrFlrOulnInfo", keys);
+    } catch (error) {
+      warnings.push(`getBrFlrOulnInfo: ${error.message}`);
+    }
     const floorList = buildFloorList(flrItems);
     const floorNos = floorList.map((x) => String(x.no));
 
@@ -45,10 +53,14 @@ module.exports = async (req, res) => {
     const effectiveFloor = effectiveFloorSpec.key || effectiveFloorSpec.no;
 
     if (!floorRaw && !hoInput) {
-      const [exposItems, pubItems] = await Promise.all([
+      const [exposResult, pubResult] = await Promise.allSettled([
         fetchBldItems("getBrExposInfo", keys),
         fetchBldItems("getBrExposPubuseAreaInfo", keys),
       ]);
+      if (exposResult.status === "rejected") warnings.push(`getBrExposInfo: ${exposResult.reason.message}`);
+      if (pubResult.status === "rejected") warnings.push(`getBrExposPubuseAreaInfo: ${pubResult.reason.message}`);
+      const exposItems = exposResult.status === "fulfilled" ? exposResult.value : [];
+      const pubItems = pubResult.status === "fulfilled" ? pubResult.value : [];
 
       return res.status(200).json({
         ok: true,
@@ -60,6 +72,7 @@ module.exports = async (req, res) => {
         keys,
         floors: floorList,
         floor_nos: floorNos,
+        warning: warnings.length ? warnings.join(" / ") : "",
         all_data: {
           floor_items: flrItems,
           expos_items: exposItems,
@@ -260,7 +273,7 @@ async function fetchBldItems(apiName, keys) {
     url.searchParams.set("numOfRows", String(BLD_PAGE_SIZE));
     url.searchParams.set("pageNo", String(pageNo));
 
-    const response = await fetch(withServiceKey(url, process.env.BLD_KEY));
+    const response = await fetchWithRetry(withServiceKey(url, process.env.BLD_KEY), apiName);
     if (!response.ok) throw new Error(`${apiName} HTTP 오류: ${response.status}`);
 
     const xml = await response.text();
@@ -276,6 +289,35 @@ async function fetchBldItems(apiName, keys) {
   }
 
   return allItems;
+}
+
+async function fetchWithRetry(url, apiName) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= BLD_FETCH_RETRIES; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(url, BLD_FETCH_TIMEOUT_MS);
+      if (response.ok || (response.status < 500 && response.status !== 429)) return response;
+      lastError = new Error(`${apiName} HTTP 오류: ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error(`${apiName} 호출 실패`);
+}
+
+async function fetchWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } catch (error) {
+    if (error && error.name === "AbortError") {
+      throw new Error(`공공데이터 API 응답 지연 (${Math.round(timeoutMs / 1000)}초 초과)`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function withServiceKey(url, serviceKey) {
