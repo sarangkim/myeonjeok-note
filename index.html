@@ -224,6 +224,23 @@
       animation: sparkPulse 2.4s ease-in-out infinite;
     }
 
+    .brand-logo.image-logo {
+      padding: 0;
+      background: #f3fbff;
+    }
+
+    .brand-logo.image-logo::before,
+    .brand-logo.image-logo::after {
+      content: none;
+    }
+
+    .brand-logo-image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
     .brand-copy { display: grid; gap: 2px; }
 
 
@@ -1487,16 +1504,11 @@
     }
 
     .quote-logo {
-      display: grid;
-      place-items: center;
       width: 64px;
       height: 64px;
       border-radius: 18px;
-      background: linear-gradient(135deg, #35c5f2, #0878b8);
-      color: #fff;
-      font-size: 34px;
-      font-weight: 900;
       box-shadow: 0 10px 22px rgba(8, 120, 184, 0.22);
+      object-fit: contain;
     }
 
     .quote-sheet h3 {
@@ -2017,9 +2029,8 @@
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <div class="brand-logo" aria-hidden="true">
-          <span class="brand-logo-mark">h</span>
-          <span class="brand-logo-spark"></span>
+        <div class="brand-logo image-logo" aria-hidden="true">
+          <img class="brand-logo-image" src="/icons/estimate-note.svg" alt="">
         </div>
         <div class="brand-copy">
           <h1>견적노트</h1>
@@ -2281,7 +2292,12 @@
                 </label>
               </div>
               <label class="quote-upload">
-                도장 이미지
+                견적서 로고
+                <input id="quoteLogoInput" type="file" accept="image/png,image/jpeg,image/webp">
+              </label>
+              <div class="note">&#47196;&#44256;&#47484; &#50629;&#47196;&#46300;&#54616;&#51648; &#50506;&#51004;&#47732; &#44396;&#44544; &#54532;&#47196;&#54596; &#51060;&#48120;&#51648;&#47484; &#49324;&#50857;&#54633;&#45768;&#45796;. &#44428;&#51109; &#53356;&#44592;: 500KB &#51060;&#54616; PNG/JPG.</div>
+              <label class="quote-upload">
+                &#46020;&#51109; &#51060;&#48120;&#51648;
                 <input id="quoteStampInput" type="file" accept="image/png,image/jpeg,image/webp">
               </label>
               <div class="note">도장 이미지는 이 브라우저에만 임시 저장됩니다. 권장 크기: 500KB 이하 PNG.</div>
@@ -2448,6 +2464,7 @@
       var quoteAmountInput = document.getElementById("quoteAmountInput");
       var quoteTaxInput = document.getElementById("quoteTaxInput");
       var quoteMemoInput = document.getElementById("quoteMemoInput");
+      var quoteLogoInput = document.getElementById("quoteLogoInput");
       var quoteStampInput = document.getElementById("quoteStampInput");
       var quoteSheet = document.getElementById("quoteSheet");
       var accountButton = document.getElementById("accountButton");
@@ -2573,6 +2590,7 @@
       quoteAmountInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
       quoteTaxInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
       quoteMemoInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
+      quoteLogoInput.addEventListener("change", handleQuoteLogoUpload);
       quoteStampInput.addEventListener("change", handleQuoteStampUpload);
       estimateTypeInput.addEventListener("change", function () {
         updateEstimateForm();
@@ -4023,6 +4041,7 @@
         var company = profile.company_name || "업체명";
         var manager = profile.display_name || "";
         var phone = profile.phone || "";
+        var logo = quoteLogoSrc();
         var stamp = localStorage.getItem("estimateNoteQuoteStamp") || "";
         var title = quoteTitleInput.value.trim() || "청소 견적서";
         var amount = quoteAmountInput.value.trim() || formatWonRange(estimate.low, estimate.high);
@@ -4040,7 +4059,7 @@
           ["추가사항", estimateNotesInput.value.trim() || "-"]
         ];
         return [
-          '<div class="quote-head"><div class="quote-logo">h</div><div><h3>' + esc(title) + '</h3><div class="quote-subtitle">견적노트 · 행복한청소</div></div></div>',
+          '<div class="quote-head"><img class="quote-logo" src="' + escAttr(logo) + '" alt=""><div><h3>' + esc(title) + '</h3></div></div>',
           '<table class="quote-table"><tbody>',
           details.map(function (row) { return '<tr><th>' + esc(row[0]) + '</th><td>' + esc(row[1]) + '</td></tr>'; }).join(""),
           '</tbody></table>',
@@ -4079,7 +4098,7 @@
           'body{margin:0;background:#fff;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",Arial,sans-serif;line-height:1.4}' +
           '.quote-sheet{display:grid;gap:13px;width:194mm;min-height:auto;margin:0 auto;border:0;border-radius:0;background:#fff;padding:0;color:#111;font-size:9pt;box-shadow:none}' +
           '.quote-head{display:flex;align-items:center;gap:12px;border-bottom:2px solid #0b4f77;padding-bottom:9px}' +
-          '.quote-logo{display:grid;place-items:center;width:14mm;height:14mm;border-radius:4mm;background:linear-gradient(135deg,#35c5f2,#0878b8);color:#fff;font-size:18pt;font-weight:900}' +
+          '.quote-logo{width:14mm;height:14mm;border-radius:4mm;object-fit:contain}' +
           '.quote-sheet h3{margin:0;font-size:18pt;text-align:left}.quote-subtitle{color:#667;font-size:8.5pt;font-weight:700}' +
           '.quote-table{width:100%;min-width:0;border-collapse:collapse;font-size:8.8pt}.quote-table th,.quote-table td{border-bottom:1px solid #dde5e8;padding:5px 6px;text-align:left;vertical-align:top;white-space:normal}.quote-table th{width:28mm;background:#eef8fc;color:#456;font-weight:800}' +
           '.quote-section{border:1px solid #dde5e8;border-radius:6px;padding:10px;break-inside:avoid}.quote-section strong{display:block;margin-bottom:6px}' +
@@ -4090,6 +4109,37 @@
           '</style></head><body>' + markup +
           '<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},450);});<\/script>' +
           '</body></html>';
+      }
+
+      function quoteLogoSrc() {
+        var uploaded = localStorage.getItem("estimateNoteQuoteLogo") || "";
+        if (uploaded) return uploaded;
+        var profile = state.profile || {};
+        if (profile.avatar_url) return profile.avatar_url;
+        var user = state.authSession && state.authSession.user ? state.authSession.user : {};
+        var metadata = user.user_metadata || {};
+        return metadata.avatar_url || metadata.picture || "/icons/estimate-note.svg";
+      }
+
+      function handleQuoteLogoUpload() {
+        var file = quoteLogoInput.files && quoteLogoInput.files[0];
+        if (!file) return;
+        if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+          estimateResult.innerHTML = '<div class="note">PNG, JPG, WebP 이미지만 사용할 수 있습니다.</div>';
+          quoteLogoInput.value = "";
+          return;
+        }
+        if (file.size > 500 * 1024) {
+          estimateResult.innerHTML = '<div class="note">견적서 로고 이미지는 500KB 이하로 올려주세요.</div>';
+          quoteLogoInput.value = "";
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+          localStorage.setItem("estimateNoteQuoteLogo", String(reader.result || ""));
+          renderQuotePreview();
+        };
+        reader.readAsDataURL(file);
       }
 
       function handleQuoteStampUpload() {
