@@ -419,6 +419,24 @@
       font-size: 12px;
     }
 
+    .profile-stat-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .profile-stat-link {
+      min-height: 0;
+      border: 1px solid rgba(38, 183, 232, 0.24);
+      border-radius: 999px;
+      background: rgba(232, 248, 255, 0.72);
+      box-shadow: none;
+      color: var(--brand-strong);
+      font-size: 12px;
+      font-weight: 850;
+      padding: 5px 9px;
+    }
+
     .profile-form {
       display: grid;
       gap: 7px;
@@ -1184,6 +1202,47 @@
       font-weight: 950;
     }
 
+    .area-highlight {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .area-highlight-card {
+      border: 1px solid rgba(38, 183, 232, 0.22);
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(231, 248, 255, 0.9));
+      box-shadow: 0 14px 28px rgba(8, 120, 184, 0.1);
+      padding: 12px;
+    }
+
+    .area-highlight-card.primary {
+      border-color: rgba(230, 0, 92, 0.25);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 239, 247, 0.92));
+    }
+
+    .area-highlight-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .area-highlight-value {
+      margin-top: 4px;
+      color: #e6005c;
+      font-size: clamp(24px, 4vw, 34px);
+      font-weight: 950;
+      line-height: 1.05;
+    }
+
+    .area-highlight-sub {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
     .pyeong-cell {
       color: #d92f72;
       font-weight: 950;
@@ -1892,6 +1951,10 @@
         grid-template-columns: 1fr;
       }
 
+      .area-highlight {
+        grid-template-columns: 1fr;
+      }
+
       .search-panel,
       .top-ad-slot,
       .workspace,
@@ -2208,6 +2271,10 @@
                   견적 금액
                   <input id="quoteAmountInput" type="text" placeholder="예: 60만원 또는 56만원 ~ 72만원">
                 </label>
+                <label>
+                  부가세 문구
+                  <input id="quoteTaxInput" type="text" value="부가세 별도" placeholder="예: 부가세 별도 / 부가세 포함">
+                </label>
                 <label class="quote-wide">
                   견적 내용
                   <textarea id="quoteMemoInput" placeholder="견적서에 넣을 작업 범위, 특이사항, 포함/제외 항목을 수정할 수 있습니다."></textarea>
@@ -2379,6 +2446,7 @@
       var quotePreview = document.getElementById("quotePreview");
       var quoteTitleInput = document.getElementById("quoteTitleInput");
       var quoteAmountInput = document.getElementById("quoteAmountInput");
+      var quoteTaxInput = document.getElementById("quoteTaxInput");
       var quoteMemoInput = document.getElementById("quoteMemoInput");
       var quoteStampInput = document.getElementById("quoteStampInput");
       var quoteSheet = document.getElementById("quoteSheet");
@@ -2503,6 +2571,7 @@
       printQuoteBtn.addEventListener("click", printQuote);
       quoteTitleInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
       quoteAmountInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
+      quoteTaxInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
       quoteMemoInput.addEventListener("input", function () { if (!quotePreview.hidden) renderQuotePreview(); });
       quoteStampInput.addEventListener("change", handleQuoteStampUpload);
       estimateTypeInput.addEventListener("change", function () {
@@ -3123,6 +3192,7 @@
         resultsEl.innerHTML = [
           renderAddress(data),
           '<section class="section"><h2 class="section-title">층 정보</h2>',
+          renderAreaHighlight(data),
           renderFloorItems(data.floor_items || []),
           renderFloorExclusive(data),
           '</section>',
@@ -3143,6 +3213,7 @@
         resultsEl.innerHTML = [
           renderAddress(data),
           '<section class="section"><h2 class="section-title">면적 합계 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
+          renderAreaHighlight(data),
           renderSum(data.sum || {}),
           data.ho_matched && data.ho_matched.note ? '<div class="note">' + esc(data.ho_matched.note) + '</div>' : '',
           '</section>',
@@ -3163,6 +3234,7 @@
         resultsEl.innerHTML = [
           renderAddress(data),
           '<section class="section"><h2 class="section-title">면적 결과 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
+          renderAreaHighlight(data),
           renderSum(data.sum || {}),
           data.note ? '<div class="note">' + esc(data.note) + '</div>' : '',
           data.floor_exclusive_note ? '<div class="note">' + esc(data.floor_exclusive_note) + '</div>' : '',
@@ -3268,6 +3340,39 @@
           '</div>',
           '</div>'
         ].join("");
+      }
+
+      function renderAreaHighlight(data) {
+        var values = areaHighlightValues(data);
+        if (!values.length) return "";
+        return '<div class="area-highlight" aria-label="\uD3C9\uC218 \uC694\uC57D">' + values.map(function (item, index) {
+          return '<div class="area-highlight-card' + (index === 0 ? ' primary' : '') + '">' +
+            '<div class="area-highlight-label">' + esc(item.label) + '</div>' +
+            '<div class="area-highlight-value">' + esc(item.value) + '</div>' +
+            (item.sub ? '<div class="area-highlight-sub">' + esc(item.sub) + '</div>' : '') +
+            '</div>';
+        }).join("") + '</div>';
+      }
+
+      function areaHighlightValues(data) {
+        var sum = data && data.sum ? data.sum : {};
+        var values = [];
+        function add(label, pyeong, sub) {
+          var value = Number(pyeong || 0);
+          if (!value) return;
+          values.push({ label: label, value: fmt(value) + "\uD3C9", sub: sub || "" });
+        }
+        if (sum.total_pyeong) add("\uD569\uACC4 \uD3C9\uC218", sum.total_pyeong, "\uC804\uC720+\uACF5\uC720");
+        if (sum.exclusive_pyeong) add("\uC804\uC720 \uD3C9\uC218", sum.exclusive_pyeong, "\uACAC\uC801 \uCC38\uACE0 \uD575\uC2EC");
+        if (sum.shared_pyeong) add("\uACF5\uC720 \uD3C9\uC218", sum.shared_pyeong, "");
+        if (!values.length && data && data.floor_exclusive_pyeong) add("\uCE35 \uC804\uC720 \uD3C9\uC218", data.floor_exclusive_pyeong, data.floor_exclusive_note || "");
+        if (!values.length && data && Array.isArray(data.floor_items) && data.floor_items.length) {
+          var floorTotal = data.floor_items.reduce(function (total, item) {
+            return total + Number(item.area_pyeong || 0);
+          }, 0);
+          add("\uCE35 \uD3C9\uC218", round2(floorTotal), "\uD45C\uC758 \uD3C9\uC218 \uD569\uACC4");
+        }
+        return values.slice(0, 3);
       }
 
       function renderFloorItems(items) {
@@ -3921,7 +4026,8 @@
         var stamp = localStorage.getItem("estimateNoteQuoteStamp") || "";
         var title = quoteTitleInput.value.trim() || "청소 견적서";
         var amount = quoteAmountInput.value.trim() || formatWonRange(estimate.low, estimate.high);
-        var amountText = /부가세|VAT/i.test(amount) ? amount : amount + " (부가세 별도)";
+        var taxText = quoteTaxInput.value.trim();
+        var amountText = taxText ? amount + " (" + taxText + ")" : amount;
         var memo = quoteMemoInput.value.trim() || estimate.lines.join("\n");
         var details = [
           ["견적일", new Date().toLocaleDateString("ko-KR")],
@@ -4379,14 +4485,36 @@
           (contact ? '<span>' + esc(contact) + '</span>' : '') +
           (profile.bio ? '<span>' + esc(profile.bio) + '</span>' : '') +
           (notificationText ? '<span>' + esc(notificationText) + '</span>' : '') +
-          '<span>' + esc(applicantStatsText(state.profileStats)) + '</span>' +
+          renderProfileStatLinks(state.profileStats) +
           '<button class="secondary" id="editProfileBtn" type="button">' + (profileForm.hidden ? '\uD504\uB85C\uD544 \uC218\uC815' : '\uD504\uB85C\uD544 \uB2EB\uAE30') + '</button>';
+        accountSummary.querySelectorAll("[data-profile-stat-view]").forEach(function (button) {
+          button.addEventListener("click", function (event) {
+            event.stopPropagation();
+            closeAccountMenu();
+            selectSideView(button.getAttribute("data-profile-stat-view"));
+          });
+        });
         document.getElementById("editProfileBtn").addEventListener("click", function (event) {
           event.stopPropagation();
           profileStatus.textContent = "";
           profileForm.hidden = !profileForm.hidden;
           renderAccountProfile();
         });
+      }
+
+      function renderProfileStatLinks(stats) {
+        stats = stats || {};
+        var items = [
+          { label: "\uB204\uC801 \uC2E0\uCCAD", count: stats.application_count, view: "applied" },
+          { label: "\uC2B9\uC778", count: stats.approved_count, view: "applied" },
+          { label: "\uBCF4\uACE0", count: stats.report_count, view: "applied" },
+          { label: "\uACAC\uC801 \uC81C\uCD9C", count: stats.quoted_count, view: "applied" }
+        ];
+        return '<div class="profile-stat-links" aria-label="\uD65C\uB3D9 \uD1B5\uACC4">' + items.map(function (item) {
+          return '<button class="profile-stat-link" type="button" data-profile-stat-view="' + escAttr(item.view) + '">' +
+            esc(item.label + " " + Number(item.count || 0) + "\uAC74") +
+            '</button>';
+        }).join("") + '</div>';
       }
 
 

@@ -1,21 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="견적노트">
   <defs>
-    <linearGradient id="sky" x1="128" y1="70" x2="390" y2="440" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg" x1="96" y1="64" x2="420" y2="448" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#64d8ff"/>
-      <stop offset=".55" stop-color="#28b9e9"/>
-      <stop offset="1" stop-color="#1299d7"/>
+      <stop offset=".58" stop-color="#28b9e9"/>
+      <stop offset="1" stop-color="#0878b8"/>
     </linearGradient>
-    <linearGradient id="paper" x1="262" y1="246" x2="410" y2="405" gradientUnits="userSpaceOnUse">
+    <linearGradient id="paper" x1="164" y1="122" x2="390" y2="410" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#eaf8ff"/>
+      <stop offset="1" stop-color="#e8f8ff"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="#f4fbff"/>
-  <path d="M257 62c48 75 112 130 112 219 0 92-70 166-156 166S58 375 58 284c0-69 48-123 95-180 19-23 34-48 46-74 18-39 34-41 58 32z" fill="url(#sky)"/>
-  <path d="M114 86l16 36 36 16-36 16-16 36-16-36-36-16 36-16 16-36zM190 42l11 25 25 11-25 11-11 25-11-25-25-11 25-11 11-25z" fill="#38c8f4"/>
-  <path d="M167 251a50 50 0 0 1 100 0h-32a18 18 0 0 0-36 0h-32z" fill="#ffffff" opacity=".92"/>
-  <path d="M265 262h135c21 0 38 17 38 38v111H227V300c0-21 17-38 38-38z" fill="url(#paper)"/>
-  <path d="M242 330h206" stroke="#1299d7" stroke-width="16" stroke-linecap="round"/>
-  <path d="M290 348v75M350 348v75M410 348v75" stroke="#1299d7" stroke-width="13" stroke-linecap="round"/>
-  <path d="M354 207l62 110h-124l62-110z" fill="#38c8f4"/>
+  <rect width="512" height="512" rx="112" fill="#f3fbff"/>
+  <path d="M153 84c28 44 69 82 69 137 0 57-44 102-98 102S26 278 26 222c0-43 30-76 59-111 12-14 21-30 28-46 12-27 26-26 40 19z" fill="url(#bg)" opacity=".92"/>
+  <path d="M178 93h170c31 0 56 25 56 56v258H128V149c0-31 25-56 56-56z" fill="url(#paper)"/>
+  <path d="M348 93v74h74" fill="#bceeff"/>
+  <path d="M186 178h150M186 236h150M186 294h96" stroke="#0b7fb9" stroke-width="22" stroke-linecap="round"/>
+  <path d="M214 372l48 48 104-124" fill="none" stroke="#22b6e8" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M103 84l12 28 28 12-28 12-12 28-12-28-28-12 28-12 12-28z" fill="#ffffff" opacity=".92"/>
 </svg>
