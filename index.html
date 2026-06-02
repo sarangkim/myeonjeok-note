@@ -148,7 +148,7 @@
       height: 54px;
       border: 1px solid rgba(38, 183, 232, 0.22);
       border-radius: 16px;
-      background: linear-gradient(145deg, rgba(255,255,255,0.96), rgba(230,248,255,0.72));
+      background: linear-gradient(145deg, #38c3ee, #0782c2);
       box-shadow: 0 16px 30px rgba(8, 120, 184, 0.14), inset 0 1px 0 rgba(255,255,255,0.96);
       overflow: hidden;
     }
@@ -156,13 +156,24 @@
     .brand-logo::before {
       content: "";
       position: absolute;
-      left: 9px;
-      bottom: 7px;
-      width: 30px;
-      height: 38px;
-      border-radius: 58% 58% 58% 12px;
-      background: linear-gradient(145deg, #35c5f2, #159fe0);
-      transform: rotate(28deg);
+      right: 9px;
+      top: 10px;
+      width: 25px;
+      height: 32px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 8px 18px rgba(0, 68, 106, 0.18);
+    }
+
+    .brand-logo::after {
+      content: "";
+      position: absolute;
+      right: 9px;
+      top: 10px;
+      width: 9px;
+      height: 9px;
+      border-radius: 0 5px 0 4px;
+      background: #bceeff;
     }
 
     .brand-logo-mark {
@@ -179,37 +190,37 @@
     .brand-logo-mark::before {
       content: "";
       position: absolute;
-      left: -2px;
-      top: -10px;
-      width: 20px;
-      height: 15px;
-      border-radius: 14px 14px 0 0;
-      border: 6px solid rgba(255, 255, 255, 0.92);
-      border-bottom: 0;
+      left: -22px;
+      top: -16px;
+      width: 22px;
+      height: 29px;
+      border-radius: 70% 70% 72% 18%;
+      background: rgba(255, 255, 255, 0.92);
+      transform: rotate(28deg);
     }
 
     .brand-logo-mark::after {
       content: "";
       position: absolute;
-      left: 17px;
-      top: 2px;
-      width: 25px;
-      height: 16px;
-      border-radius: 8px 8px 2px 2px;
-      background: rgba(255,255,255,0.96);
-      box-shadow: -9px 16px 0 -6px rgba(255,255,255,0.96), 8px 16px 0 -6px rgba(255,255,255,0.96);
+      left: 6px;
+      top: -1px;
+      width: 18px;
+      height: 9px;
+      border-left: 4px solid #0878b8;
+      border-bottom: 4px solid #0878b8;
+      transform: rotate(-45deg);
     }
 
     .brand-logo-spark {
       position: absolute;
-      right: 9px;
-      top: 9px;
+      left: 11px;
+      top: 10px;
       z-index: 2;
-      width: 9px;
-      height: 9px;
+      width: 7px;
+      height: 7px;
       border-radius: 999px;
       background: #ffffff;
-      box-shadow: -16px 8px 0 -2px #ffffff, 0 0 0 4px rgba(99, 212, 245, 0.2);
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16);
       animation: sparkPulse 2.4s ease-in-out infinite;
     }
 
@@ -1789,19 +1800,25 @@
       }
 
       .brand-logo::before {
-        inset: 6px;
-        border-radius: 10px;
+        right: 7px;
+        top: 8px;
+        width: 20px;
+        height: 25px;
+        border-radius: 4px;
       }
 
-      .brand-logo-mark {
-        font-size: 21px;
+      .brand-logo::after {
+        right: 7px;
+        top: 8px;
+        width: 7px;
+        height: 7px;
       }
 
       .brand-logo-spark {
-        right: 7px;
-        top: 7px;
-        width: 7px;
-        height: 7px;
+        left: 8px;
+        top: 8px;
+        width: 6px;
+        height: 6px;
       }
 
       .brand-copy {
@@ -3947,9 +3964,6 @@
         printWindow.document.write(quotePrintDocument(quoteSheet.outerHTML));
         printWindow.document.close();
         printWindow.focus();
-        setTimeout(function () {
-          printWindow.print();
-        }, 250);
       }
 
       function quotePrintDocument(markup) {
@@ -3965,7 +3979,11 @@
           '.quote-section{border:1px solid #dde5e8;border-radius:6px;padding:10px;break-inside:avoid}.quote-section strong{display:block;margin-bottom:6px}' +
           '.quote-total{display:flex;justify-content:space-between;gap:12px;border:2px solid #0878b8;border-radius:8px;padding:10px 12px;font-size:13pt;font-weight:900;break-inside:avoid}' +
           '.note{color:#556;font-size:8pt}.quote-stamp-row{display:flex;align-items:flex-end;justify-content:flex-end;gap:14px;min-height:18mm;break-inside:avoid}.quote-stamp{display:grid;place-items:center;width:18mm;height:18mm;border:1px dashed #cfd8dc;border-radius:50%;color:#99a;font-size:8pt}.quote-stamp img{width:100%;height:100%;object-fit:contain}' +
-          '</style></head><body>' + markup + '</body></html>';
+          '@media screen{body{padding:14px;background:#eef8fc}.quote-sheet{padding:16px;border-radius:10px;box-shadow:0 12px 30px rgba(8,120,184,.14)}}' +
+          '@media print{body{padding:0!important;background:#fff!important}.quote-sheet{padding:0!important;border-radius:0!important;box-shadow:none!important}}' +
+          '</style></head><body>' + markup +
+          '<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},450);});<\/script>' +
+          '</body></html>';
       }
 
       function handleQuoteStampUpload() {
