@@ -1713,6 +1713,63 @@
       font-size: 12px;
     }
 
+    .ops-dashboard {
+      display: grid;
+      gap: 14px;
+    }
+
+    .ops-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+      gap: 10px;
+    }
+
+    .ops-summary-card {
+      border: 1px solid rgba(38, 183, 232, 0.2);
+      border-radius: 14px;
+      background: rgba(232, 248, 255, 0.72);
+      padding: 12px;
+    }
+
+    .ops-summary-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .ops-summary-card strong {
+      display: block;
+      margin-top: 4px;
+      color: var(--brand-strong);
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .ops-section {
+      display: grid;
+      gap: 8px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+
+    .ops-section h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .ops-mini-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .ops-mini-list .note-card {
+      box-shadow: none;
+    }
+
     .memo-box {
       display: grid;
       gap: 8px;
@@ -2046,6 +2103,7 @@
           <button type="button" data-side-view="mine">내가 올린 요청</button>
           <button type="button" data-side-view="applied">내가 지원한 요청</button>
           <button type="button" data-side-view="board">&#44172;&#49884;&#54032;</button>
+          <button type="button" data-side-view="adminOps" id="adminOpsMenu" hidden>운영관리</button>
           <button type="button" data-side-view="adminProviders" id="adminProvidersMenu" hidden>&#50629;&#52404; &#49849;&#51064;</button>
         </div>
       </nav>
@@ -2335,6 +2393,17 @@
           <ul class="note-list" id="boardList"></ul>
         </div>
 
+        <div class="side-panel" id="adminOpsPanel" hidden>
+          <h2>운영관리</h2>
+          <div class="button-row">
+            <button class="secondary" id="refreshAdminOpsBtn" type="button">새로고침</button>
+            <button class="secondary" id="goBoardModerationBtn" type="button">신고/숨김 보기</button>
+            <button class="secondary" id="goProviderAdminBtn" type="button">업체 승인 보기</button>
+          </div>
+          <div class="note" id="adminOpsStatus" role="status" aria-live="polite"></div>
+          <div class="ops-dashboard" id="adminOpsDashboard"></div>
+        </div>
+
         <div class="side-panel" id="adminProvidersPanel" hidden>
           <h2>&#50629;&#52404; &#49849;&#51064;</h2>
           <div class="button-row">
@@ -2520,6 +2589,13 @@
       var createBoardPostBtn = document.getElementById("createBoardPostBtn");
       var boardStatus = document.getElementById("boardStatus");
       var boardList = document.getElementById("boardList");
+      var adminOpsMenu = document.getElementById("adminOpsMenu");
+      var adminOpsPanel = document.getElementById("adminOpsPanel");
+      var refreshAdminOpsBtn = document.getElementById("refreshAdminOpsBtn");
+      var goBoardModerationBtn = document.getElementById("goBoardModerationBtn");
+      var goProviderAdminBtn = document.getElementById("goProviderAdminBtn");
+      var adminOpsStatus = document.getElementById("adminOpsStatus");
+      var adminOpsDashboard = document.getElementById("adminOpsDashboard");
       var defaultAdminEmails = ["77happycleaning@gmail.com", "hangstore77@gmail.com", "onlyghjr@gmail.com", "contact@happycleaning.co.kr"];
 
       var state = {
@@ -2641,6 +2717,12 @@
         loadBoardPosts();
       });
       boardModerationBtn.addEventListener("click", loadBoardModeration);
+      refreshAdminOpsBtn.addEventListener("click", loadAdminDashboard);
+      goBoardModerationBtn.addEventListener("click", function () {
+        selectSideView("board");
+        loadBoardModeration();
+      });
+      goProviderAdminBtn.addEventListener("click", function () { selectSideView("adminProviders"); });
       loadPendingProvidersBtn.addEventListener("click", function () { loadProviderApprovals("pending"); });
       loadApprovedProvidersBtn.addEventListener("click", function () { loadProviderApprovals("approved"); });
       loadSuspendedProvidersBtn.addEventListener("click", function () { loadProviderApprovals("suspended"); });
@@ -3878,9 +3960,10 @@
 
       function updateAdminMenu() {
         if (!adminProvidersMenu) return;
+        if (adminOpsMenu) adminOpsMenu.hidden = !state.isAdmin;
         adminProvidersMenu.hidden = !state.isAdmin;
         if (boardModerationBtn) boardModerationBtn.hidden = !state.isAdmin;
-        if (!state.isAdmin && !adminProvidersPanel.hidden) selectSideView("notes");
+        if (!state.isAdmin && ((!adminProvidersPanel.hidden) || (adminOpsPanel && !adminOpsPanel.hidden))) selectSideView("notes");
       }
 
       function canSeeProviderTerms() {
@@ -3923,7 +4006,7 @@
 
       function selectSideView(view) {
         closeMainMenu();
-        if (view === "adminProviders" && !state.isAdmin) view = "notes";
+        if ((view === "adminProviders" || view === "adminOps") && !state.isAdmin) view = "notes";
         workspaceEl.classList.add("side-open");
         sideTabButtons.forEach(function (button) {
           button.classList.toggle("active", button.getAttribute("data-side-view") === view);
@@ -3932,13 +4015,15 @@
         var isNotes = view === "notes";
         var isEstimate = view === "estimate";
         var isBoard = view === "board";
+        var isAdminOps = view === "adminOps";
         var isAdminProviders = view === "adminProviders";
         notesPanel.hidden = !isNotes;
         estimatePanel.hidden = !isEstimate;
         boardPanel.hidden = !isBoard;
+        adminOpsPanel.hidden = !isAdminOps;
         adminProvidersPanel.hidden = !isAdminProviders;
-        requestsPanel.hidden = isNotes || isEstimate || isBoard || isAdminProviders;
-        fieldCreateBlock.hidden = isNotes || isBoard || isAdminProviders || view === "public" || view === "mine" || view === "applied";
+        requestsPanel.hidden = isNotes || isEstimate || isBoard || isAdminOps || isAdminProviders;
+        fieldCreateBlock.hidden = isNotes || isBoard || isAdminOps || isAdminProviders || view === "public" || view === "mine" || view === "applied";
 
         if (isEstimate) {
           syncEstimateArea(state.currentResult);
@@ -3954,6 +4039,8 @@
           loadAppliedFieldRequests();
         } else if (isBoard) {
           loadBoardPosts();
+        } else if (isAdminOps) {
+          loadAdminDashboard();
         } else if (isAdminProviders) {
           loadProviderApprovals("pending");
         }
@@ -5610,6 +5697,119 @@
       function shortText(text, max) {
         var s = String(text || "").replace(/\\s+/g, " ").trim();
         return s.length > max ? s.slice(0, max - 1) + "…" : s;
+      }
+
+      async function loadAdminDashboard() {
+        if (!state.isAdmin) {
+          adminOpsStatus.textContent = "관리자만 볼 수 있습니다.";
+          return;
+        }
+        adminOpsStatus.textContent = "운영 현황을 불러오는 중입니다.";
+        adminOpsDashboard.innerHTML = "";
+        try {
+          var response = await fetch("/api/admin-dashboard", { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "운영 현황을 불러오지 못했습니다.");
+          renderAdminDashboard(data);
+          adminOpsStatus.textContent = "운영 현황을 불러왔습니다.";
+        } catch (error) {
+          adminOpsStatus.textContent = error.message;
+        }
+      }
+
+      function renderAdminDashboard(data) {
+        var stats = data.stats || {};
+        adminOpsDashboard.innerHTML = [
+          renderOpsSummary(stats),
+          renderOpsSection("처리 대기", [
+            ["승인 대기 업체", stats.pending_providers || 0, "providers"],
+            ["미보고 신청", stats.report_needed || 0, "applied"],
+            ["접수된 신고", stats.open_reports || 0, "moderation"],
+            ["활동 제한 업체", stats.suspended_providers || 0, "providers"]
+          ]),
+          renderOpsList("최근 현장요청", data.field_requests || [], renderOpsRequest),
+          renderOpsList("쪽지 최근 내역", data.recent_messages || [], renderOpsMessage),
+          renderOpsList("신고/숨김", (data.board_reports || []).concat(data.hidden_posts || [], data.hidden_comments || []), renderOpsModeration),
+          renderOpsList("패널티 업체", data.penalty_providers || [], renderOpsProvider)
+        ].join("");
+        adminOpsDashboard.querySelectorAll("[data-ops-action]").forEach(function (button) {
+          button.addEventListener("click", function () { handleOpsAction(button.getAttribute("data-ops-action")); });
+        });
+      }
+
+      function renderOpsSummary(stats) {
+        var items = [
+          ["공개 현장요청", stats.open_requests],
+          ["대기 신청", stats.pending_applications],
+          ["미보고", stats.report_needed],
+          ["신고", stats.open_reports],
+          ["숨김", stats.hidden_items],
+          ["쪽지", stats.recent_messages]
+        ];
+        return '<div class="ops-summary-grid">' + items.map(function (item) {
+          return '<div class="ops-summary-card"><span>' + esc(item[0]) + '</span><strong>' + esc(String(Number(item[1] || 0))) + '</strong></div>';
+        }).join("") + '</div>';
+      }
+
+      function renderOpsSection(title, items) {
+        return '<section class="ops-section"><h3>' + esc(title) + '</h3><div class="button-row">' + items.map(function (item) {
+          return '<button class="secondary" type="button" data-ops-action="' + escAttr(item[2]) + '">' + esc(item[0] + " " + Number(item[1] || 0) + "건") + '</button>';
+        }).join("") + '</div></section>';
+      }
+
+      function renderOpsList(title, items, renderer) {
+        var body = items.length ? items.slice(0, 8).map(renderer).join("") : '<li class="note-card"><span>표시할 항목이 없습니다.</span></li>';
+        return '<section class="ops-section"><h3>' + esc(title) + '</h3><ul class="ops-mini-list">' + body + '</ul></section>';
+      }
+
+      function renderOpsRequest(request) {
+        var profile = request.requester_profile || {};
+        var title = [request.cleaning_type, request.space_type].filter(Boolean).join(" / ") || "현장요청";
+        var place = request.public_area || request.road || request.address || "";
+        return '<li class="note-card"><strong>' + esc(title) + '</strong><span>' + esc([place, request.status, formatDateTime(request.updated_at || request.created_at)].filter(Boolean).join(" | ")) + '</span><span>' + esc(opsProfileName(profile)) + '</span></li>';
+      }
+
+      function renderOpsMessage(message) {
+        var profile = message.sender_profile || {};
+        var request = message.request || {};
+        return '<li class="note-card"><strong>' + esc(opsProfileName(profile)) + '</strong><span>' + esc(shortText(message.body || "", 90)) + '</span><span>' + esc([request.public_area || request.road || "", formatDateTime(message.created_at)].filter(Boolean).join(" | ")) + '</span></li>';
+      }
+
+      function renderOpsModeration(item) {
+        if (item.reason) {
+          return '<li class="note-card"><strong>' + esc("신고: " + (item.target_type === "comment" ? "댓글" : "게시글")) + '</strong><span>' + esc(shortText(item.reason || "", 100)) + '</span><button class="chip" type="button" data-ops-action="moderation">신고/숨김 보기</button></li>';
+        }
+        if (item.title) {
+          return '<li class="note-card"><strong>' + esc("숨김 글: " + (item.title || "제목 없음")) + '</strong><span>' + esc(formatDateTime(item.updated_at || item.created_at)) + '</span><button class="chip" type="button" data-ops-action="moderation">확인</button></li>';
+        }
+        return '<li class="note-card"><strong>숨김 댓글</strong><span>' + esc(shortText(item.body || "", 100)) + '</span><button class="chip" type="button" data-ops-action="moderation">확인</button></li>';
+      }
+
+      function renderOpsProvider(profile) {
+        return '<li class="note-card"><strong>' + esc(opsProfileName(profile)) + '</strong><span>' + esc(["상태 " + providerStatusLabel(profile.provider_status), "패널티 " + Number(profile.provider_penalty_count || 0) + "회", profile.service_area || ""].filter(Boolean).join(" | ")) + '</span><button class="chip" type="button" data-ops-action="providers">업체 관리</button></li>';
+      }
+
+      function handleOpsAction(action) {
+        if (action === "providers") {
+          selectSideView("adminProviders");
+        } else if (action === "moderation") {
+          selectSideView("board");
+          loadBoardModeration();
+        } else if (action === "applied") {
+          selectSideView("applied");
+        }
+      }
+
+      function opsProfileName(profile) {
+        return profile.company_name || profile.display_name || profile.email || "회원 정보 없음";
+      }
+
+      function providerStatusLabel(status) {
+        if (status === "approved") return "승인";
+        if (status === "pending") return "대기";
+        if (status === "suspended") return "활동 제한";
+        if (status === "rejected") return "거절";
+        return "없음";
       }
 
       async function getConfig() {
