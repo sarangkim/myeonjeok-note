@@ -1329,6 +1329,48 @@
       transform: none;
     }
 
+    .news-list {
+      gap: 10px;
+    }
+
+    .news-card {
+      display: grid;
+      gap: 8px;
+    }
+
+    .news-card a {
+      color: var(--text);
+      font-weight: 900;
+      line-height: 1.45;
+      text-decoration: none;
+    }
+
+    .news-card a:hover,
+    .news-card a:focus-visible {
+      color: var(--brand-strong);
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+
+    .news-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .news-keyword {
+      width: fit-content;
+      border: 1px solid rgba(38, 183, 232, 0.22);
+      border-radius: 999px;
+      background: rgba(232, 248, 255, 0.86);
+      color: var(--brand-strong);
+      font-size: 12px;
+      font-weight: 850;
+      padding: 4px 8px;
+    }
+
     .note-card {
       border-color: rgba(38, 183, 232, 0.14);
       border-radius: 14px;
@@ -2104,6 +2146,7 @@
           <button type="button" data-side-view="mine">내가 올린 요청</button>
           <button type="button" data-side-view="applied">내가 지원한 요청</button>
           <button type="button" data-side-view="board">&#44172;&#49884;&#54032;</button>
+          <button type="button" data-side-view="news">청소뉴스</button>
           <button type="button" data-side-view="adminOps" id="adminOpsMenu" hidden>운영관리</button>
           <button type="button" data-side-view="adminProviders" id="adminProvidersMenu" hidden>&#50629;&#52404; &#49849;&#51064;</button>
         </div>
@@ -2394,6 +2437,17 @@
           <ul class="note-list" id="boardList"></ul>
         </div>
 
+        <div class="side-panel" id="newsPanel" hidden>
+          <h2>청소뉴스</h2>
+          <div class="note">청소업체, 사무실 청소, 시설관리, 위생관리 관련 소식을 모아 보여줍니다.</div>
+          <div class="button-row">
+            <button class="secondary" id="refreshNewsBtn" type="button">새로고침</button>
+            <a class="chip" href="https://news.google.com/search?q=%EC%B2%AD%EC%86%8C%EC%97%85%EC%B2%B4%20%EC%82%AC%EB%AC%B4%EC%8B%A4%20%EC%B2%AD%EC%86%8C&hl=ko&gl=KR&ceid=KR%3Ako" target="_blank" rel="noopener noreferrer">구글뉴스에서 보기</a>
+          </div>
+          <div class="note board-status" id="newsStatus" role="status" aria-live="polite"></div>
+          <ul class="note-list news-list" id="newsList"></ul>
+        </div>
+
         <div class="side-panel" id="adminOpsPanel" hidden>
           <h2>운영관리</h2>
           <div class="button-row">
@@ -2590,6 +2644,10 @@
       var createBoardPostBtn = document.getElementById("createBoardPostBtn");
       var boardStatus = document.getElementById("boardStatus");
       var boardList = document.getElementById("boardList");
+      var newsPanel = document.getElementById("newsPanel");
+      var refreshNewsBtn = document.getElementById("refreshNewsBtn");
+      var newsStatus = document.getElementById("newsStatus");
+      var newsList = document.getElementById("newsList");
       var adminOpsMenu = document.getElementById("adminOpsMenu");
       var adminOpsPanel = document.getElementById("adminOpsPanel");
       var refreshAdminOpsBtn = document.getElementById("refreshAdminOpsBtn");
@@ -2622,7 +2680,8 @@
         boardCategory: "",
         boardSearch: "",
         boardPage: 1,
-        boardPageSize: 10
+        boardPageSize: 10,
+        cleaningNewsLoaded: false
       };
 
       form.addEventListener("submit", function (event) {
@@ -2718,6 +2777,7 @@
         loadBoardPosts();
       });
       boardModerationBtn.addEventListener("click", loadBoardModeration);
+      refreshNewsBtn.addEventListener("click", function () { loadCleaningNews(true); });
       refreshAdminOpsBtn.addEventListener("click", loadAdminDashboard);
       goBoardModerationBtn.addEventListener("click", function () {
         selectSideView("board");
@@ -4016,15 +4076,17 @@
         var isNotes = view === "notes";
         var isEstimate = view === "estimate";
         var isBoard = view === "board";
+        var isNews = view === "news";
         var isAdminOps = view === "adminOps";
         var isAdminProviders = view === "adminProviders";
         notesPanel.hidden = !isNotes;
         estimatePanel.hidden = !isEstimate;
         boardPanel.hidden = !isBoard;
+        newsPanel.hidden = !isNews;
         adminOpsPanel.hidden = !isAdminOps;
         adminProvidersPanel.hidden = !isAdminProviders;
-        requestsPanel.hidden = isNotes || isEstimate || isBoard || isAdminOps || isAdminProviders;
-        fieldCreateBlock.hidden = isNotes || isBoard || isAdminOps || isAdminProviders || view === "public" || view === "mine" || view === "applied";
+        requestsPanel.hidden = isNotes || isEstimate || isBoard || isNews || isAdminOps || isAdminProviders;
+        fieldCreateBlock.hidden = isNotes || isBoard || isNews || isAdminOps || isAdminProviders || view === "public" || view === "mine" || view === "applied";
 
         if (isEstimate) {
           syncEstimateArea(state.currentResult);
@@ -4040,6 +4102,8 @@
           loadAppliedFieldRequests();
         } else if (isBoard) {
           loadBoardPosts();
+        } else if (isNews) {
+          loadCleaningNews(false);
         } else if (isAdminOps) {
           loadAdminDashboard();
         } else if (isAdminProviders) {
@@ -5698,6 +5762,44 @@
       function shortText(text, max) {
         var s = String(text || "").replace(/\\s+/g, " ").trim();
         return s.length > max ? s.slice(0, max - 1) + "…" : s;
+      }
+
+      async function loadCleaningNews(force) {
+        if (!newsPanel || newsPanel.hidden) return;
+        if (state.cleaningNewsLoaded && !force) return;
+        newsStatus.textContent = "청소뉴스를 불러오는 중입니다.";
+        newsStatus.className = "note board-status";
+        newsList.innerHTML = "";
+        try {
+          var response = await fetch("/api/cleaning-news" + (force ? "?refresh=1" : ""));
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "청소뉴스를 불러오지 못했습니다.");
+          state.cleaningNewsLoaded = true;
+          renderCleaningNews(data.items || []);
+          newsStatus.textContent = (data.cached ? "저장된 뉴스" : "최신 뉴스") + "를 불러왔습니다.";
+          newsStatus.className = "note board-status success";
+        } catch (error) {
+          newsStatus.textContent = error.message || "청소뉴스를 불러오지 못했습니다.";
+          newsStatus.className = "note board-status error";
+          newsList.innerHTML = '<li class="note-card"><span>잠시 후 다시 시도하거나 구글뉴스에서 직접 확인해주세요.</span></li>';
+        }
+      }
+
+      function renderCleaningNews(items) {
+        if (!items.length) {
+          newsList.innerHTML = '<li class="note-card"><span>표시할 청소뉴스가 없습니다.</span></li>';
+          return;
+        }
+        newsList.innerHTML = items.map(function (item) {
+          var date = item.published_at ? formatDateTime(item.published_at) : "";
+          var meta = [item.source || "뉴스", date].filter(Boolean).join(" | ");
+          return '<li class="note-card news-card">' +
+            '<a href="' + escAttr(item.link) + '" target="_blank" rel="noopener noreferrer">' + esc(item.title || "제목 없음") + '</a>' +
+            '<div class="news-meta"><span>' + esc(meta) + '</span></div>' +
+            (item.summary ? '<span>' + esc(shortText(item.summary, 120)) + '</span>' : '') +
+            (item.keyword ? '<span class="news-keyword">' + esc(item.keyword) + '</span>' : '') +
+            '</li>';
+        }).join("");
       }
 
       async function loadAdminDashboard() {
