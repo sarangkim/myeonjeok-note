@@ -5,20 +5,20 @@ let cachedAt = 0;
 let cachedPayload = null;
 
 const queries = [
-  "청소업체",
-  "사무실 청소",
-  "상가 청소",
-  "병원 청소",
-  "건물 청소 관리",
-  "청소 위생관리",
-  "에어컨 청소",
-  "입주청소",
-  "시설관리 청소",
-  "소상공인 지원금 청소업",
-  "청소업 소상공인 정부지원",
-  "자영업자 지원금",
-  "소상공인 정책자금",
-  "소상공인 고용지원금"
+  { keyword: "청소업체", category: "industry" },
+  { keyword: "사무실 청소", category: "industry" },
+  { keyword: "상가 청소", category: "industry" },
+  { keyword: "병원 청소", category: "industry" },
+  { keyword: "입주청소", category: "industry" },
+  { keyword: "건물 청소 관리", category: "facility" },
+  { keyword: "청소 위생관리", category: "facility" },
+  { keyword: "시설관리 청소", category: "facility" },
+  { keyword: "에어컨 청소", category: "aircon" },
+  { keyword: "소상공인 지원금 청소업", category: "support" },
+  { keyword: "청소업 소상공인 정부지원", category: "support" },
+  { keyword: "자영업자 지원금", category: "support" },
+  { keyword: "소상공인 정책자금", category: "support" },
+  { keyword: "소상공인 고용지원금", category: "support" }
 ];
 
 module.exports = async (request, response) => {
@@ -70,8 +70,9 @@ module.exports = async (request, response) => {
 };
 
 async function fetchFeed(query) {
+  const keyword = query.keyword || query;
   const url = "https://news.google.com/rss/search?q=" +
-    encodeURIComponent(query + " when:30d") +
+    encodeURIComponent(keyword + " when:30d") +
     "&hl=ko&gl=KR&ceid=KR:ko";
   const result = await fetch(url, {
     headers: {
@@ -80,10 +81,10 @@ async function fetchFeed(query) {
   });
   if (!result.ok) throw new Error("RSS fetch failed: " + result.status);
   const xml = await result.text();
-  return extractItems(xml, query);
+  return extractItems(xml, keyword, query.category || "industry");
 }
 
-function extractItems(xml, query) {
+function extractItems(xml, query, category) {
   const matches = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
   return matches.map((itemXml) => {
     const title = cleanText(readTag(itemXml, "title"));
@@ -100,7 +101,8 @@ function extractItems(xml, query) {
       source: source || parseSource(title) || "Google News",
       published_at: toIsoDate(pubDate),
       summary: trimText(description, 150),
-      keyword: query
+      keyword: query,
+      category
     };
   }).filter(Boolean);
 }
