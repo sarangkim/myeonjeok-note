@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
@@ -1371,6 +1371,46 @@
       padding: 4px 8px;
     }
 
+    .news-filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .news-filter .chip.active {
+      border-color: rgba(38, 183, 232, 0.45);
+      background: var(--brand);
+      color: #fff;
+    }
+
+    .provider-home-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .provider-home-card {
+      border: 1px solid rgba(38, 183, 232, 0.18);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.68);
+      padding: 13px;
+    }
+
+    .provider-home-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .provider-home-card strong {
+      display: block;
+      margin-top: 6px;
+      color: var(--brand-strong);
+      font-size: 22px;
+      font-weight: 950;
+    }
+
     .note-card {
       border-color: rgba(38, 183, 232, 0.14);
       border-radius: 14px;
@@ -2140,6 +2180,7 @@
       <nav class="main-nav" aria-label="&#51452;&#50836; &#47700;&#45684;">
         <button class="menu-button secondary" id="mainMenuButton" type="button" aria-label="&#47700;&#45684; &#50676;&#44592;" aria-expanded="false">&#9776;</button>
         <div class="main-menu" id="mainMenu" hidden>
+          <button type="button" data-side-view="providerHome" id="providerHomeMenu" hidden>업체홈</button>
           <button class="active" type="button" data-side-view="notes">&#45236; &#47700;&#47784;</button>
           <button type="button" data-side-view="estimate">&#44204;&#51201;</button>
           <button type="button" data-side-view="public">현장요청 찾기</button>
@@ -2213,6 +2254,19 @@
       <main class="results" id="results"></main>
       <button class="workspace-resizer" id="workspaceResizer" type="button" aria-label="게시판 영역 크기 조절"></button>
       <aside class="note-panel">
+        <div class="side-panel" id="providerHomePanel" hidden>
+          <h2>업체홈</h2>
+          <div class="note">청소업체가 자주 확인하는 요청, 신청, 쪽지, 견적서, 지원금 뉴스를 모았습니다.</div>
+          <div class="provider-home-grid" id="providerHomeSummary"></div>
+          <div class="button-row">
+            <button class="secondary" type="button" data-provider-home-view="public">새 현장요청</button>
+            <button class="secondary" type="button" data-provider-home-view="applied">내 신청</button>
+            <button class="secondary" type="button" data-provider-home-view="estimate">견적서 만들기</button>
+            <button class="secondary" type="button" data-provider-home-view="news">지원금 뉴스</button>
+          </div>
+          <ul class="note-list" id="providerHomeList"></ul>
+        </div>
+
         <div class="side-panel" id="notesPanel">
           <h2>내 메모</h2>
           <div class="memo-box">
@@ -2440,6 +2494,13 @@
         <div class="side-panel" id="newsPanel" hidden>
           <h2>청소뉴스</h2>
           <div class="note">청소업체, 사무실 청소, 시설관리, 정부지원·지원금 관련 소식을 모아 보여줍니다.</div>
+          <div class="news-filter" id="newsFilter" aria-label="뉴스 분류">
+            <button class="chip active" type="button" data-news-category="">전체</button>
+            <button class="chip" type="button" data-news-category="industry">청소업계</button>
+            <button class="chip" type="button" data-news-category="support">지원금</button>
+            <button class="chip" type="button" data-news-category="facility">시설관리</button>
+            <button class="chip" type="button" data-news-category="aircon">에어컨</button>
+          </div>
           <div class="button-row">
             <button class="secondary" id="refreshNewsBtn" type="button">새로고침</button>
             <a class="chip" href="https://news.google.com/search?q=%EC%B2%AD%EC%86%8C%EC%97%85%EC%B2%B4%20%EC%82%AC%EB%AC%B4%EC%8B%A4%20%EC%B2%AD%EC%86%8C&hl=ko&gl=KR&ceid=KR%3Ako" target="_blank" rel="noopener noreferrer">구글뉴스에서 보기</a>
@@ -2629,6 +2690,10 @@
       var mainMenuButton = document.getElementById("mainMenuButton");
       var mainMenu = document.getElementById("mainMenu");
       var sideTabButtons = document.querySelectorAll("[data-side-view]");
+      var providerHomeMenu = document.getElementById("providerHomeMenu");
+      var providerHomePanel = document.getElementById("providerHomePanel");
+      var providerHomeSummary = document.getElementById("providerHomeSummary");
+      var providerHomeList = document.getElementById("providerHomeList");
       var notesPanel = document.getElementById("notesPanel");
       var requestsPanel = document.getElementById("requestsPanel");
       var requestsPanelTitle = document.getElementById("requestsPanelTitle");
@@ -2645,6 +2710,7 @@
       var boardStatus = document.getElementById("boardStatus");
       var boardList = document.getElementById("boardList");
       var newsPanel = document.getElementById("newsPanel");
+      var newsFilter = document.getElementById("newsFilter");
       var refreshNewsBtn = document.getElementById("refreshNewsBtn");
       var newsStatus = document.getElementById("newsStatus");
       var newsList = document.getElementById("newsList");
@@ -2681,7 +2747,9 @@
         boardSearch: "",
         boardPage: 1,
         boardPageSize: 10,
-        cleaningNewsLoaded: false
+        cleaningNewsLoaded: false,
+        cleaningNewsItems: [],
+        cleaningNewsCategory: ""
       };
 
       form.addEventListener("submit", function (event) {
@@ -2778,6 +2846,18 @@
       });
       boardModerationBtn.addEventListener("click", loadBoardModeration);
       refreshNewsBtn.addEventListener("click", function () { loadCleaningNews(true); });
+      newsFilter.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-news-category]");
+        if (!button) return;
+        state.cleaningNewsCategory = button.getAttribute("data-news-category") || "";
+        updateNewsFilterButtons();
+        renderCleaningNews(state.cleaningNewsItems || []);
+      });
+      providerHomePanel.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-provider-home-view]");
+        if (!button) return;
+        selectSideView(button.getAttribute("data-provider-home-view"));
+      });
       refreshAdminOpsBtn.addEventListener("click", loadAdminDashboard);
       goBoardModerationBtn.addEventListener("click", function () {
         selectSideView("board");
@@ -4020,11 +4100,20 @@
       }
 
       function updateAdminMenu() {
+        updateProviderHomeMenu();
         if (!adminProvidersMenu) return;
         if (adminOpsMenu) adminOpsMenu.hidden = !state.isAdmin;
         adminProvidersMenu.hidden = !state.isAdmin;
         if (boardModerationBtn) boardModerationBtn.hidden = !state.isAdmin;
         if (!state.isAdmin && ((!adminProvidersPanel.hidden) || (adminOpsPanel && !adminOpsPanel.hidden))) selectSideView("notes");
+      }
+
+      function updateProviderHomeMenu() {
+        if (!providerHomeMenu) return;
+        var profile = state.profile || {};
+        var canShow = !!state.isAdmin || profile.member_role === "provider";
+        providerHomeMenu.hidden = !canShow;
+        if (!canShow && providerHomePanel && !providerHomePanel.hidden) selectSideView("notes");
       }
 
       function canSeeProviderTerms() {
@@ -4068,27 +4157,32 @@
       function selectSideView(view) {
         closeMainMenu();
         if ((view === "adminProviders" || view === "adminOps") && !state.isAdmin) view = "notes";
+        if (view === "providerHome" && providerHomeMenu && providerHomeMenu.hidden) view = "notes";
         workspaceEl.classList.add("side-open");
         sideTabButtons.forEach(function (button) {
           button.classList.toggle("active", button.getAttribute("data-side-view") === view);
         });
 
         var isNotes = view === "notes";
+        var isProviderHome = view === "providerHome";
         var isEstimate = view === "estimate";
         var isBoard = view === "board";
         var isNews = view === "news";
         var isAdminOps = view === "adminOps";
         var isAdminProviders = view === "adminProviders";
         notesPanel.hidden = !isNotes;
+        providerHomePanel.hidden = !isProviderHome;
         estimatePanel.hidden = !isEstimate;
         boardPanel.hidden = !isBoard;
         newsPanel.hidden = !isNews;
         adminOpsPanel.hidden = !isAdminOps;
         adminProvidersPanel.hidden = !isAdminProviders;
-        requestsPanel.hidden = isNotes || isEstimate || isBoard || isNews || isAdminOps || isAdminProviders;
-        fieldCreateBlock.hidden = isNotes || isBoard || isNews || isAdminOps || isAdminProviders || view === "public" || view === "mine" || view === "applied";
+        requestsPanel.hidden = isNotes || isProviderHome || isEstimate || isBoard || isNews || isAdminOps || isAdminProviders;
+        fieldCreateBlock.hidden = isNotes || isProviderHome || isBoard || isNews || isAdminOps || isAdminProviders || view === "public" || view === "mine" || view === "applied";
 
-        if (isEstimate) {
+        if (isProviderHome) {
+          renderProviderHome();
+        } else if (isEstimate) {
           syncEstimateArea(state.currentResult);
           renderEstimate();
         } else if (view === "public") {
@@ -5764,6 +5858,36 @@
         return s.length > max ? s.slice(0, max - 1) + "…" : s;
       }
 
+      function renderProviderHome() {
+        if (!providerHomeSummary || !providerHomeList) return;
+        var profile = state.profile || {};
+        var stats = state.profileStats || {};
+        var status = providerStatusLabel(profile.provider_status);
+        var penalty = Number(profile.provider_penalty_count || 0);
+        var cards = [
+          ["누적 신청", stats.application_count],
+          ["승인", stats.approved_count],
+          ["보고 필요", stats.report_needed_count || stats.report_needed],
+          ["견적 제출", stats.quoted_count],
+          ["쪽지 알림", stats.notification_count]
+        ];
+        providerHomeSummary.innerHTML = cards.map(function (item) {
+          return '<button class="provider-home-card" type="button" data-provider-home-view="applied"><span>' + esc(item[0]) + '</span><strong>' + esc(String(Number(item[1] || 0))) + '</strong></button>';
+        }).join("");
+        providerHomeList.innerHTML = [
+          '<li class="note-card"><strong>' + esc(profile.company_name || profile.display_name || "업체 프로필") + '</strong><span>' + esc(["승인 상태 " + status, "패널티 " + penalty + "회", profile.service_area || ""].filter(Boolean).join(" | ")) + '</span></li>',
+          '<li class="note-card"><strong>오늘 확인할 일</strong><span>새 현장요청을 확인하고, 승인된 요청은 방문/견적 보고를 남겨주세요.</span></li>',
+          '<li class="note-card"><strong>지원금 뉴스</strong><span>청소뉴스의 지원금 필터에서 소상공인 정책자금과 정부지원 소식을 바로 확인할 수 있습니다.</span></li>'
+        ].join("");
+      }
+
+      function updateNewsFilterButtons() {
+        if (!newsFilter) return;
+        newsFilter.querySelectorAll("[data-news-category]").forEach(function (button) {
+          button.classList.toggle("active", (button.getAttribute("data-news-category") || "") === state.cleaningNewsCategory);
+        });
+      }
+
       async function loadCleaningNews(force) {
         if (!newsPanel || newsPanel.hidden) return;
         if (state.cleaningNewsLoaded && !force) return;
@@ -5775,7 +5899,8 @@
           var data = await response.json().catch(function () { return null; });
           if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "청소뉴스를 불러오지 못했습니다.");
           state.cleaningNewsLoaded = true;
-          renderCleaningNews(data.items || []);
+          state.cleaningNewsItems = data.items || [];
+          renderCleaningNews(state.cleaningNewsItems);
           newsStatus.textContent = (data.cached ? "저장된 뉴스" : "최신 뉴스") + "를 불러왔습니다.";
           newsStatus.className = "note board-status success";
         } catch (error) {
@@ -5786,11 +5911,15 @@
       }
 
       function renderCleaningNews(items) {
-        if (!items.length) {
+        updateNewsFilterButtons();
+        var filteredItems = state.cleaningNewsCategory
+          ? (items || []).filter(function (item) { return item.category === state.cleaningNewsCategory; })
+          : (items || []);
+        if (!filteredItems.length) {
           newsList.innerHTML = '<li class="note-card"><span>표시할 청소뉴스가 없습니다.</span></li>';
           return;
         }
-        newsList.innerHTML = items.map(function (item) {
+        newsList.innerHTML = filteredItems.map(function (item) {
           var date = item.published_at ? formatDateTime(item.published_at) : "";
           var meta = [item.source || "뉴스", date].filter(Boolean).join(" | ");
           return '<li class="note-card news-card">' +
