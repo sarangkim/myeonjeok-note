@@ -603,6 +603,134 @@
       padding: 18px;
     }
 
+    .home-news-panel {
+      display: grid;
+      gap: 12px;
+      margin: 12px 0;
+      border: 1px solid rgba(38, 183, 232, 0.18);
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.86), rgba(234,248,255,0.78));
+      box-shadow: 0 18px 48px rgba(12, 88, 135, 0.1), inset 0 1px 0 rgba(255,255,255,0.82);
+      backdrop-filter: blur(18px);
+      padding: 16px;
+    }
+
+    .home-news-panel[hidden] { display: none; }
+
+    .home-news-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .home-news-head h2 {
+      margin: 0;
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .home-news-head p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .home-news-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .home-news-card {
+      display: grid;
+      grid-template-columns: 82px minmax(0, 1fr);
+      gap: 10px;
+      min-width: 0;
+      border: 1px solid rgba(38, 183, 232, 0.16);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.78);
+      color: var(--text);
+      text-decoration: none;
+      padding: 10px;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+
+    .home-news-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(38, 183, 232, 0.38);
+      box-shadow: 0 14px 26px rgba(12, 88, 135, 0.13);
+    }
+
+    .home-news-thumb {
+      display: grid;
+      place-items: end start;
+      min-height: 76px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #28b7e7, #0878b8);
+      overflow: hidden;
+      position: relative;
+      padding: 8px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .home-news-thumb::before {
+      content: "";
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      right: -14px;
+      top: -16px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.28);
+    }
+
+    .home-news-thumb::after {
+      content: "";
+      position: absolute;
+      width: 38px;
+      height: 44px;
+      right: 12px;
+      bottom: 10px;
+      border-radius: 9px 9px 5px 5px;
+      background: rgba(255,255,255,0.24);
+      box-shadow: -18px 12px 0 rgba(255,255,255,0.16);
+    }
+
+    .home-news-thumb span {
+      position: relative;
+      z-index: 1;
+    }
+
+    .home-news-thumb.support { background: linear-gradient(135deg, #43c7f0, #4b63d8); }
+    .home-news-thumb.facility { background: linear-gradient(135deg, #21b9d6, #0c958d); }
+    .home-news-thumb.aircon { background: linear-gradient(135deg, #76d8ff, #167bc7); }
+
+    .home-news-body { min-width: 0; }
+
+    .home-news-title {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1.35;
+    }
+
+    .home-news-meta {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
     .top-ad-slot {
       display: block;
       width: 100%;
@@ -2248,6 +2376,17 @@
       </div>
     </form>
 
+
+    <section class="home-news-panel" id="homeNewsPanel" aria-label="오늘의 청소뉴스" hidden>
+      <div class="home-news-head">
+        <div>
+          <h2>오늘의 청소뉴스</h2>
+          <p>청소업계와 소상공인 지원 소식을 짧게 확인해보세요.</p>
+        </div>
+        <button class="secondary" id="homeNewsMoreBtn" type="button">더 보기</button>
+      </div>
+      <div class="home-news-list" id="homeNewsList"></div>
+    </section>
     <div class="top-ad-slot" id="topAdSlot" aria-label="광고" hidden></div>
 
     <div class="workspace no-results" id="workspace">
@@ -2598,6 +2737,9 @@
       var deferredInstallPrompt = null;
       var statusEl = document.getElementById("status");
       var topAdSlot = document.getElementById("topAdSlot");
+      var homeNewsPanel = document.getElementById("homeNewsPanel");
+      var homeNewsList = document.getElementById("homeNewsList");
+      var homeNewsMoreBtn = document.getElementById("homeNewsMoreBtn");
       var workspaceEl = document.getElementById("workspace");
       var workspaceResizer = document.getElementById("workspaceResizer");
       var resultsEl = document.getElementById("results");
@@ -2747,6 +2889,7 @@
         boardSearch: "",
         boardPage: 1,
         boardPageSize: 10,
+        homeNewsLoaded: false,
         cleaningNewsLoaded: false,
         cleaningNewsItems: [],
         cleaningNewsCategory: ""
@@ -2845,6 +2988,7 @@
         loadBoardPosts();
       });
       boardModerationBtn.addEventListener("click", loadBoardModeration);
+      homeNewsMoreBtn.addEventListener("click", function () { selectSideView("news"); });
       refreshNewsBtn.addEventListener("click", function () { loadCleaningNews(true); });
       newsFilter.addEventListener("click", function (event) {
         var button = event.target.closest("[data-news-category]");
@@ -2883,6 +3027,7 @@
 
       initAuth();
       initAds();
+      loadHomeNews();
       initAnalytics();
       initSearchProgressiveFields();
       initInstallShortcut();
@@ -5888,9 +6033,55 @@
         });
       }
 
+      async function loadHomeNews() {
+        if (!homeNewsPanel || state.homeNewsLoaded) return;
+        try {
+          var response = await fetch("/api/cleaning-news");
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) return;
+          state.homeNewsLoaded = true;
+          state.cleaningNewsLoaded = true;
+          state.cleaningNewsItems = data.items || [];
+          renderHomeNews(state.cleaningNewsItems);
+        } catch (error) {
+          homeNewsPanel.hidden = true;
+        }
+      }
+
+      function renderHomeNews(items) {
+        var selected = (items || []).filter(function (item) {
+          return ["industry", "support", "facility", "aircon"].indexOf(item.category) !== -1;
+        }).slice(0, 3);
+        if (!selected.length) {
+          homeNewsPanel.hidden = true;
+          return;
+        }
+        homeNewsList.innerHTML = selected.map(function (item) {
+          var category = item.category || "industry";
+          var label = newsCategoryLabel(category);
+          var date = item.published_at ? formatDateTime(item.published_at) : "";
+          var meta = [item.source || "뉴스", date].filter(Boolean).join(" | ");
+          return '<a class="home-news-card" href="' + escAttr(item.link) + '" target="_blank" rel="noopener noreferrer">' +
+            '<div class="home-news-thumb ' + escAttr(category) + '"><span>' + esc(label) + '</span></div>' +
+            '<div class="home-news-body"><strong class="home-news-title">' + esc(item.title || "제목 없음") + '</strong>' +
+            '<span class="home-news-meta">' + esc(meta) + '</span></div>' +
+            '</a>';
+        }).join("");
+        homeNewsPanel.hidden = false;
+      }
+
+      function newsCategoryLabel(category) {
+        if (category === "support") return "지원금";
+        if (category === "facility") return "시설관리";
+        if (category === "aircon") return "에어컨";
+        return "청소업계";
+      }
       async function loadCleaningNews(force) {
         if (!newsPanel || newsPanel.hidden) return;
-        if (state.cleaningNewsLoaded && !force) return;
+        if (state.cleaningNewsLoaded && !force) {
+          renderCleaningNews(state.cleaningNewsItems || []);
+          return;
+        }
         newsStatus.textContent = "청소뉴스를 불러오는 중입니다.";
         newsStatus.className = "note board-status";
         newsList.innerHTML = "";
