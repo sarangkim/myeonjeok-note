@@ -2236,6 +2236,7 @@
       }
 
       .search-panel,
+      .home-news-panel,
       .top-ad-slot,
       .workspace,
       .results,
@@ -2246,6 +2247,40 @@
       }
 
       .workspace-resizer {
+        display: none;
+      }
+
+      .home-news-head {
+        align-items: flex-start;
+      }
+
+      .home-news-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .home-news-card {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .home-news-thumb {
+        width: 100%;
+        min-height: 76px;
+      }
+
+      .home-news-title {
+        font-size: 12px;
+        line-height: 1.35;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+        -webkit-line-clamp: 3;
+      }
+
+      .home-news-meta {
         display: none;
       }
 
@@ -2912,6 +2947,7 @@
         setFloors([]);
         setStatus("");
         resultsEl.innerHTML = "";
+        showHomeNews();
         updateWorkspaceLayout();
         fieldCreateBlock.hidden = true;
         addressInput.focus();
@@ -3186,6 +3222,7 @@
           setFloors(data.floors || []);
           setSearchDetailsVisible((data.floors || []).length > 0);
           renderSummary(data);
+          hideHomeNews();
           remember(data, "층 목록");
           setCurrentResult(data);
           prefillFieldRequest(data);
@@ -3204,6 +3241,7 @@
         try {
           var data = hasPrefetch(address) ? buildFloorFromPrefetch(floor) : await requestArea({ address: address, floor: floor });
           renderFloor(data);
+          hideHomeNews();
           remember(data, "층");
           setCurrentResult(data);
           selectSideView("estimate");
@@ -3246,6 +3284,7 @@
           if (data.mode === "floor") renderFloor(data);
           else if (data.mode === "ho_breakdown" || data.mode === "multi_exposInfo_fallback") renderHoBreakdown(data);
           else renderFallback(data);
+          hideHomeNews();
           remember(data, ho ? "호" : "층");
           setCurrentResult(data);
           selectSideView("estimate");
@@ -6076,6 +6115,16 @@
         if (category === "aircon") return "에어컨";
         return "청소업계";
       }
+
+      function hideHomeNews() {
+        if (homeNewsPanel) homeNewsPanel.hidden = true;
+      }
+
+      function showHomeNews() {
+        if (!homeNewsPanel || !state.homeNewsLoaded || !state.cleaningNewsItems.length) return;
+        renderHomeNews(state.cleaningNewsItems);
+      }
+
       async function loadCleaningNews(force) {
         if (!newsPanel || newsPanel.hidden) return;
         if (state.cleaningNewsLoaded && !force) {
