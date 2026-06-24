@@ -761,6 +761,80 @@
       overflow: hidden !important;
     }
 
+    .intro-steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .intro-step {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+      border: 1px solid rgba(38, 183, 232, 0.18);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.72);
+      box-shadow: 0 14px 32px rgba(12, 88, 135, 0.08);
+      padding: 13px;
+    }
+
+    .intro-step span {
+      color: var(--brand-strong);
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .intro-step strong {
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.35;
+    }
+
+    .result-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .result-summary-card {
+      display: grid;
+      gap: 6px;
+      border: 1px solid rgba(38, 183, 232, 0.2);
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(234,248,255,0.84));
+      padding: 14px;
+    }
+
+    .result-summary-card span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .result-summary-card strong {
+      color: #e7337c;
+      font-size: clamp(22px, 3vw, 32px);
+      line-height: 1.1;
+      font-weight: 950;
+    }
+
+    .estimate-nudge {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+      border: 1px solid rgba(38, 183, 232, 0.2);
+      border-radius: 14px;
+      background: #f2fbff;
+      color: var(--text);
+      padding: 12px;
+    }
+
+    .estimate-nudge strong {
+      color: var(--brand-strong);
+    }
+
     .search-grid {
       display: grid;
       grid-template-columns: minmax(280px, 1.5fr) minmax(150px, 0.45fr) minmax(150px, 0.45fr);
@@ -2234,6 +2308,11 @@
         grid-template-columns: 1fr;
       }
 
+      .intro-steps,
+      .result-summary {
+        grid-template-columns: 1fr;
+      }
+
       .area-highlight {
         grid-template-columns: 1fr;
       }
@@ -2407,6 +2486,11 @@
       </div>
     </form>
 
+    <section class="intro-steps" id="introSteps" aria-label="견적노트 사용 순서">
+      <div class="intro-step"><span>1단계</span><strong>주소를 입력해 건물 정보를 조회합니다.</strong></div>
+      <div class="intro-step"><span>2단계</span><strong>층과 호를 골라 평수를 확인합니다.</strong></div>
+      <div class="intro-step"><span>3단계</span><strong>확인한 면적으로 청소견적을 계산합니다.</strong></div>
+    </section>
 
     <section class="home-news-panel" id="homeNewsPanel" aria-label="오늘의 청소뉴스" hidden>
       <div class="home-news-head">
@@ -2768,6 +2852,7 @@
       var deferredInstallPrompt = null;
       var statusEl = document.getElementById("status");
       var topAdSlot = document.getElementById("topAdSlot");
+      var introSteps = document.getElementById("introSteps");
       var homeNewsPanel = document.getElementById("homeNewsPanel");
       var homeNewsList = document.getElementById("homeNewsList");
       var homeNewsMoreBtn = document.getElementById("homeNewsMoreBtn");
@@ -2943,6 +3028,7 @@
         setFloors([]);
         setStatus("");
         resultsEl.innerHTML = "";
+        showIntroSteps();
         showHomeNews();
         updateWorkspaceLayout();
         fieldCreateBlock.hidden = true;
@@ -3218,6 +3304,7 @@
           setFloors(data.floors || []);
           setSearchDetailsVisible((data.floors || []).length > 0);
           renderSummary(data);
+          hideIntroSteps();
           hideHomeNews();
           remember(data, "층 목록");
           setCurrentResult(data);
@@ -3237,6 +3324,7 @@
         try {
           var data = hasPrefetch(address) ? buildFloorFromPrefetch(floor) : await requestArea({ address: address, floor: floor });
           renderFloor(data);
+          hideIntroSteps();
           hideHomeNews();
           remember(data, "층");
           setCurrentResult(data);
@@ -3280,6 +3368,7 @@
           if (data.mode === "floor") renderFloor(data);
           else if (data.mode === "ho_breakdown" || data.mode === "multi_exposInfo_fallback") renderHoBreakdown(data);
           else renderFallback(data);
+          hideIntroSteps();
           hideHomeNews();
           remember(data, ho ? "호" : "층");
           setCurrentResult(data);
@@ -3613,6 +3702,7 @@
         resultsEl.innerHTML = [
           renderAddress(data),
           '<section class="section"><h2 class="section-title">층 정보</h2>',
+          renderResultSummary(data),
           renderAreaHighlight(data),
           renderFloorItems(data.floor_items || []),
           renderFloorExclusive(data),
@@ -3634,6 +3724,7 @@
         resultsEl.innerHTML = [
           renderAddress(data),
           '<section class="section"><h2 class="section-title">면적 합계 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
+          renderResultSummary(data),
           renderAreaHighlight(data),
           renderSum(data.sum || {}),
           data.ho_matched && data.ho_matched.note ? '<div class="note">' + esc(data.ho_matched.note) + '</div>' : '',
@@ -3655,6 +3746,7 @@
         resultsEl.innerHTML = [
           renderAddress(data),
           '<section class="section"><h2 class="section-title">면적 결과 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
+          renderResultSummary(data),
           renderAreaHighlight(data),
           renderSum(data.sum || {}),
           data.note ? '<div class="note">' + esc(data.note) + '</div>' : '',
@@ -3823,6 +3915,27 @@
           box("합계 평", sum.total_pyeong),
           '</div>'
         ].join("");
+      }
+
+      function renderResultSummary(data) {
+        var sum = data && data.sum ? data.sum : {};
+        var exclusive = Number(sum.exclusive_pyeong || data.floor_exclusive_pyeong || 0);
+        var shared = Number(sum.shared_pyeong || 0);
+        var total = Number(sum.total_pyeong || exclusive || 0);
+        if (!exclusive && !shared && !total) return "";
+        return [
+          '<div class="result-summary" aria-label="조회 면적 요약">',
+          resultSummaryCard("전유 면적", exclusive),
+          resultSummaryCard("공용 면적", shared),
+          resultSummaryCard("견적 기준", total),
+          '</div>',
+          '<div class="estimate-nudge"><strong>면적이 확인되었습니다.</strong><span>오른쪽 청소 견적에서 면적이 자동 입력됩니다. 조건을 확인한 뒤 견적 계산을 눌러보세요.</span></div>'
+        ].join("");
+      }
+
+      function resultSummaryCard(label, value) {
+        var display = Number(value || 0) ? fmt(value) + "평" : "-";
+        return '<div class="result-summary-card"><span>' + esc(label) + '</span><strong>' + esc(display) + '</strong></div>';
       }
 
       function renderBreakdown(rows) {
@@ -6119,6 +6232,14 @@
       function showHomeNews() {
         if (!homeNewsPanel || !state.homeNewsLoaded || !state.cleaningNewsItems.length) return;
         renderHomeNews(state.cleaningNewsItems);
+      }
+
+      function hideIntroSteps() {
+        if (introSteps) introSteps.hidden = true;
+      }
+
+      function showIntroSteps() {
+        if (introSteps) introSteps.hidden = false;
       }
 
       async function loadCleaningNews(force) {
