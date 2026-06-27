@@ -1233,6 +1233,28 @@
       font-size: 15px;
     }
 
+    body.embed-mode {
+      background: #eef9ff;
+    }
+
+    body.embed-mode .app {
+      width: min(100% - 20px, 1180px);
+      padding-top: 10px;
+      padding-bottom: 10px;
+    }
+
+    body.embed-mode .topbar,
+    body.embed-mode .intro-steps,
+    body.embed-mode .home-news-panel,
+    body.embed-mode .top-ad-slot,
+    body.embed-mode .footer {
+      display: none !important;
+    }
+
+    body.embed-mode .search-panel {
+      margin-top: 0;
+    }
+
     body::before {
       content: "";
       position: fixed;
@@ -2795,6 +2817,8 @@
 
       var API_PATH = "/api/area";
       var PYEONG_M2 = 3.305785;
+      var pageParams = new URLSearchParams(window.location.search);
+      var isEmbedMode = pageParams.get("embed") === "1";
       var form = document.getElementById("form");
       var addressInput = document.getElementById("address");
       var floorSelect = document.getElementById("floor");
@@ -3098,14 +3122,16 @@
       });
       new MutationObserver(updateWorkspaceLayout).observe(resultsEl, { childList: true });
 
+      initEmbedMode();
       initAuth();
-      initAds();
-      loadHomeNews();
+      if (!isEmbedMode) initAds();
+      if (!isEmbedMode) loadHomeNews();
       initAnalytics();
       initSearchProgressiveFields();
       initInstallShortcut();
       initWorkspaceResize();
       loadSharedNoteFromUrl();
+      loadEmbedAddressFromUrl();
       updateWorkspaceLayout();
 
       async function requestArea(params) {
@@ -3130,6 +3156,27 @@
         } finally {
           setBusy(false);
         }
+      }
+
+      function initEmbedMode() {
+        if (!isEmbedMode) return;
+        document.body.classList.add("embed-mode");
+        hideIntroSteps();
+        hideHomeNews();
+        if (topAdSlot) topAdSlot.hidden = true;
+      }
+
+      function loadEmbedAddressFromUrl() {
+        if (!isEmbedMode || !addressInput) return;
+        var address = pageParams.get("address") || pageParams.get("q") || "";
+        address = address.trim();
+        if (!address) return;
+        addressInput.value = address;
+        setSearchDetailsVisible(false);
+        setStatus("주소를 조회 중입니다.");
+        setTimeout(function () {
+          loadSummary();
+        }, 80);
       }
 
       async function initAds() {
