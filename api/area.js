@@ -53,15 +53,6 @@ module.exports = async (req, res) => {
     const effectiveFloor = effectiveFloorSpec.key || effectiveFloorSpec.no;
 
     if (!floorRaw && !hoInput) {
-      const [exposResult, pubResult] = await Promise.allSettled([
-        fetchBldItems("getBrExposInfo", keys),
-        fetchBldItems("getBrExposPubuseAreaInfo", keys),
-      ]);
-      if (exposResult.status === "rejected") warnings.push(`getBrExposInfo: ${exposResult.reason.message}`);
-      if (pubResult.status === "rejected") warnings.push(`getBrExposPubuseAreaInfo: ${pubResult.reason.message}`);
-      const exposItems = exposResult.status === "fulfilled" ? exposResult.value : [];
-      const pubItems = pubResult.status === "fulfilled" ? pubResult.value : [];
-
       return res.status(200).json({
         ok: true,
         build: BUILD,
@@ -75,8 +66,8 @@ module.exports = async (req, res) => {
         warning: warnings.length ? warnings.join(" / ") : "",
         all_data: {
           floor_items: flrItems,
-          expos_items: exposItems,
-          pub_items: pubItems,
+          expos_items: [],
+          pub_items: [],
         },
       });
     }
