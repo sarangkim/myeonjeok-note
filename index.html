@@ -1255,6 +1255,14 @@
       margin-top: 0;
     }
 
+    body.embed-mode #notesPanel {
+      display: none !important;
+    }
+
+    body.embed-mode [data-side-view="notes"] {
+      display: none !important;
+    }
+
     body::before {
       content: "";
       position: fixed;
@@ -3164,6 +3172,12 @@
         hideIntroSteps();
         hideHomeNews();
         if (topAdSlot) topAdSlot.hidden = true;
+        if (notesPanel) {
+          notesPanel.hidden = true;
+          notesPanel.innerHTML = "";
+        }
+        if (estimatePanel) estimatePanel.hidden = false;
+        if (workspaceEl) workspaceEl.classList.add("side-open");
       }
 
       function loadEmbedAddressFromUrl() {
@@ -3758,10 +3772,12 @@
         mountFieldCreateBlock(data);
       }
       function renderFieldRequestMount() {
+        if (isEmbedMode) return "";
         return '<section class="section" id="fieldCreateMount"><h2 class="section-title">\uD604\uC7A5 \uACAC\uC801 \uC694\uCCAD</h2></section>';
       }
 
       function mountFieldCreateBlock(data) {
+        if (isEmbedMode) return;
 
 
         var mount = document.getElementById("fieldCreateMount");
