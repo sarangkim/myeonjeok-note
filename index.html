@@ -3148,8 +3148,10 @@
         try {
           var url = new URL(API_PATH, window.location.origin);
           Object.keys(params).forEach(function (key) {
-            if (params[key] !== undefined && params[key] !== null && String(params[key]).trim() !== "") {
-              url.searchParams.set(key, String(params[key]).trim());
+            var value = params[key];
+            if (key === "floor") value = apiFloorValue(value);
+            if (value !== undefined && value !== null && String(value).trim() !== "") {
+              url.searchParams.set(key, String(value).trim());
             }
           });
 
@@ -3563,11 +3565,14 @@
       }
 
       function hasPrefetch(address) {
+        var all = state.prefetch && state.prefetch.all_data;
         return !!(
           state.prefetch &&
           state.lastAddress === address &&
-          state.prefetch.all_data &&
-          Array.isArray(state.prefetch.all_data.floor_items)
+          all &&
+          Array.isArray(all.floor_items) &&
+          ((Array.isArray(all.expos_items) && all.expos_items.length) ||
+            (Array.isArray(all.pub_items) && all.pub_items.length))
         );
       }
 
@@ -6602,6 +6607,12 @@
       function normalizeFloor(value) {
         var match = String(value || "").match(/-?\d+/);
         return match ? String(Number(match[0])) : "";
+      }
+
+      function apiFloorValue(value) {
+        var spec = parseFloorInput(value);
+        if (!spec.no) return "";
+        return spec.gb === "지하" ? "-" + spec.no : spec.no;
       }
 
       function parseFloorInput(value) {
