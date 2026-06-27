@@ -256,7 +256,7 @@ function normalizeAddressInput(s) {
   return String(s || "")
     .trim()
     .replace(/\s+/g, " ")
-    .replace(/([가-힣A-Za-z])(\d)/g, "$1 $2");
+    .replace(/([\uAC00-\uD7A3A-Za-z])(\d)/g, "$1 $2");
 }
 
 async function fetchBldItems(apiName, keys) {
