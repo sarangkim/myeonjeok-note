@@ -1,5 +1,5 @@
 const TABLE = "estimate_inquiries";
-const COLUMNS = "id,name,phone,address,estimate_url,source,user_agent,referrer,status,created_at";
+const COLUMNS = "id,name,phone,address,estimate_url,source,user_agent,referrer,status,memo,created_at";
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -28,6 +28,7 @@ module.exports = async (req, res) => {
       address: clamp(body.address, 500),
       estimate_url: clamp(body.estimateUrl || body.estimate_url, 1000),
       source: clamp(body.source, 120) || "happycleaning.co.kr",
+      memo: clamp(body.memo, 1000),
       user_agent: clamp(req.headers["user-agent"], 500),
       referrer: clamp(req.headers.referer || req.headers.referrer, 1000),
       status: "new",
@@ -54,7 +55,7 @@ function supabaseBaseUrl() {
 
 function assertSupabaseEnv() {
   if (!supabaseBaseUrl()) throw new Error("Supabase 주소 설정이 없습니다.");
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase 서비스 키 설정이 없습니다.");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase service role key 설정이 없습니다.");
 }
 
 async function supabaseRequest(path, options) {
