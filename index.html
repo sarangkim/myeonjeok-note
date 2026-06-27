@@ -1425,47 +1425,6 @@
       font-weight: 950;
     }
 
-    .area-highlight {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .area-highlight-card {
-      border: 1px solid rgba(38, 183, 232, 0.22);
-      border-radius: 16px;
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(231, 248, 255, 0.9));
-      box-shadow: 0 14px 28px rgba(8, 120, 184, 0.1);
-      padding: 12px;
-    }
-
-    .area-highlight-card.primary {
-      border-color: rgba(230, 0, 92, 0.25);
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 239, 247, 0.92));
-    }
-
-    .area-highlight-label {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 850;
-    }
-
-    .area-highlight-value {
-      margin-top: 4px;
-      color: #e6005c;
-      font-size: clamp(24px, 4vw, 34px);
-      font-weight: 950;
-      line-height: 1.05;
-    }
-
-    .area-highlight-sub {
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
     .pyeong-cell {
       color: #d92f72;
       font-weight: 950;
@@ -2310,10 +2269,6 @@
 
       .intro-steps,
       .result-summary {
-        grid-template-columns: 1fr;
-      }
-
-      .area-highlight {
         grid-template-columns: 1fr;
       }
 
@@ -3703,7 +3658,6 @@
           renderAddress(data),
           '<section class="section"><h2 class="section-title">층 정보</h2>',
           renderResultSummary(data),
-          renderAreaHighlight(data),
           renderFloorItems(data.floor_items || []),
           renderFloorExclusive(data),
           '</section>',
@@ -3725,7 +3679,6 @@
           renderAddress(data),
           '<section class="section"><h2 class="section-title">면적 합계 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
           renderResultSummary(data),
-          renderAreaHighlight(data),
           renderSum(data.sum || {}),
           data.ho_matched && data.ho_matched.note ? '<div class="note">' + esc(data.ho_matched.note) + '</div>' : '',
           '</section>',
@@ -3747,7 +3700,6 @@
           renderAddress(data),
           '<section class="section"><h2 class="section-title">면적 결과 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
           renderResultSummary(data),
-          renderAreaHighlight(data),
           renderSum(data.sum || {}),
           data.note ? '<div class="note">' + esc(data.note) + '</div>' : '',
           data.floor_exclusive_note ? '<div class="note">' + esc(data.floor_exclusive_note) + '</div>' : '',
@@ -3855,39 +3807,6 @@
         ].join("");
       }
 
-      function renderAreaHighlight(data) {
-        var values = areaHighlightValues(data);
-        if (!values.length) return "";
-        return '<div class="area-highlight" aria-label="\uD3C9\uC218 \uC694\uC57D">' + values.map(function (item, index) {
-          return '<div class="area-highlight-card' + (index === 0 ? ' primary' : '') + '">' +
-            '<div class="area-highlight-label">' + esc(item.label) + '</div>' +
-            '<div class="area-highlight-value">' + esc(item.value) + '</div>' +
-            (item.sub ? '<div class="area-highlight-sub">' + esc(item.sub) + '</div>' : '') +
-            '</div>';
-        }).join("") + '</div>';
-      }
-
-      function areaHighlightValues(data) {
-        var sum = data && data.sum ? data.sum : {};
-        var values = [];
-        function add(label, pyeong, sub) {
-          var value = Number(pyeong || 0);
-          if (!value) return;
-          values.push({ label: label, value: fmt(value) + "\uD3C9", sub: sub || "" });
-        }
-        if (sum.total_pyeong) add("\uD569\uACC4 \uD3C9\uC218", sum.total_pyeong, "\uC804\uC720+\uACF5\uC720");
-        if (sum.exclusive_pyeong) add("\uC804\uC720 \uD3C9\uC218", sum.exclusive_pyeong, "\uACAC\uC801 \uCC38\uACE0 \uD575\uC2EC");
-        if (sum.shared_pyeong) add("\uACF5\uC720 \uD3C9\uC218", sum.shared_pyeong, "");
-        if (!values.length && data && data.floor_exclusive_pyeong) add("\uCE35 \uC804\uC720 \uD3C9\uC218", data.floor_exclusive_pyeong, data.floor_exclusive_note || "");
-        if (!values.length && data && Array.isArray(data.floor_items) && data.floor_items.length) {
-          var floorTotal = data.floor_items.reduce(function (total, item) {
-            return total + Number(item.area_pyeong || 0);
-          }, 0);
-          add("\uCE35 \uD3C9\uC218", round2(floorTotal), "\uD45C\uC758 \uD3C9\uC218 \uD569\uACC4");
-        }
-        return values.slice(0, 3);
-      }
-
       function renderFloorItems(items) {
         if (!items.length) return '<div class="note">층 면적 항목이 없습니다.</div>';
         return [
@@ -3927,9 +3846,9 @@
           '<div class="result-summary" aria-label="조회 면적 요약">',
           resultSummaryCard("전유 면적", exclusive),
           resultSummaryCard("공용 면적", shared),
-          resultSummaryCard("견적 기준", total),
+          resultSummaryCard("합계 평수", total),
           '</div>',
-          '<div class="estimate-nudge"><strong>면적이 확인되었습니다.</strong><span>오른쪽 청소 견적에서 면적이 자동 입력됩니다. 조건을 확인한 뒤 견적 계산을 눌러보세요.</span></div>'
+          '<div class="estimate-nudge"><strong>면적이 확인되었습니다.</strong><span>청소 견적의 면적 칸에 자동 입력되었습니다. 필요한 조건을 확인한 뒤 견적 계산을 눌러보세요.</span></div>'
         ].join("");
       }
 
