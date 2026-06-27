@@ -38,8 +38,13 @@ module.exports = async (req, res) => {
       method: "POST",
       body: JSON.stringify(row),
     });
+    const inquiry = created[0] || row;
+    const telegram = await sendTelegramNotification(inquiry).catch((error) => ({
+      ok: false,
+      message: error.message || String(error),
+    }));
 
-    return res.status(201).json({ ok: true, inquiry: created[0] || row });
+    return res.status(201).json({ ok: true, inquiry, telegram });
   } catch (error) {
     return res.status(500).json({ ok: false, message: error.message || String(error) });
   }
@@ -77,6 +82,34 @@ async function supabaseRequest(path, options) {
     throw new Error(data?.message || data?.hint || `Supabase 오류: ${response.status}`);
   }
   return Array.isArray(data) ? data : [];
+}
+
+async function sendTelegramNotification(inquiry) {
+  const token = String(process.env.TELEGRAM_BOT_TOKEN || "").trim();
+  const chatId = String(process.env.TELEGRAM_CHAT_ID || "").trim();
+  if (!token || !chatId) return { ok: false, skipped: true, message: "텔레그램 환경변수가 없습니다." };
+
+  const text = [
+    "새 상담 요청이 접수되었습니다.",
+    `접수 ID: ${inquiry.id || "-"}`,
+    `출처: ${inquiry.source || "-"}`,
+    "개인정보는 Supabase estimate_inquiries 테이블에서 확인하세요.",
+  ].join("\n");
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      disable_web_page_preview: true,
+    }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.description || `Telegram 오류: ${response.status}`);
+  }
+  return { ok: true };
 }
 
 function readJson(req) {
