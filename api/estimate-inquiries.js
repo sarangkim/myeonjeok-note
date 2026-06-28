@@ -52,6 +52,10 @@ module.exports = async (req, res) => {
     const body = await readJson(req);
     const name = clamp(body.name, 80);
     const phone = clamp(body.phone, 80);
+    const floor = clamp(body.floor, 80);
+    const ho = normalizeHo(clamp(body.ho, 80));
+    const address = inquiryAddress(body.address, floor, ho);
+    const estimateUrl = inquiryEstimateUrl(body.estimateUrl || body.estimate_url, body.address, floor, ho);
 
     if (!name || !phone) {
       return res.status(400).json({ ok: false, message: "담당자 이름과 연락처가 필요합니다." });
@@ -61,8 +65,8 @@ module.exports = async (req, res) => {
       id: makeId(12),
       name,
       phone,
-      address: clamp(body.address, 500),
-      estimate_url: clamp(body.estimateUrl || body.estimate_url, 1000),
+      address: clamp(address, 500),
+      estimate_url: clamp(estimateUrl, 1000),
       source: clamp(body.source, 120) || "happycleaning.co.kr",
       memo: clamp(body.memo, 1000),
       user_agent: clamp(req.headers["user-agent"], 500),
@@ -199,6 +203,37 @@ function readJson(req) {
 function clamp(value, max) {
   const text = String(value || "").trim();
   return text.length > max ? text.slice(0, max) : text;
+}
+
+function normalizeHo(value) {
+  const text = String(value || "").trim();
+  return text ? text.replace(/호$/, "") + "호" : "";
+}
+
+function inquiryAddress(address, floor, ho) {
+  const base = clamp(address, 500);
+  const unit = [floor, ho].filter(Boolean).join(" / ");
+  if (!unit) return base;
+  if (base.includes(unit)) return base;
+  return [base, unit].filter(Boolean).join(" / ");
+}
+
+function inquiryEstimateUrl(rawUrl, address, floor, ho) {
+  let url;
+  try {
+    url = new URL(String(rawUrl || "https://area.happycleaning.co.kr/?embed=1"));
+  } catch {
+    url = new URL("https://area.happycleaning.co.kr/?embed=1");
+  }
+  url.searchParams.set("embed", "1");
+  const baseAddress = clamp(address, 500).split(" / ")[0].trim();
+  if (baseAddress) {
+    url.searchParams.set("address", baseAddress);
+    url.searchParams.set("q", baseAddress);
+  }
+  if (floor) url.searchParams.set("floor", floor);
+  if (ho) url.searchParams.set("ho", ho.replace(/호$/, ""));
+  return url.toString();
 }
 
 function makeId(length) {
