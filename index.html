@@ -3776,6 +3776,7 @@
           renderResultSummary(data),
           renderFloorItems(data.floor_items || []),
           renderFloorExclusive(data),
+          renderAreaConfirmedNudge(),
           '</section>',
           '<section class="section" data-ho-picker-section><h2 class="section-title">호 목록</h2>',
           renderHoPickerTools(),
@@ -3796,6 +3797,7 @@
           '<section class="section"><h2 class="section-title">면적 합계 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
           renderResultSummary(data),
           renderSum(data.sum || {}),
+          renderAreaConfirmedNudge(),
           data.ho_matched && data.ho_matched.note ? '<div class="note">' + esc(data.ho_matched.note) + '</div>' : '',
           '</section>',
           '<section class="section"><h2 class="section-title">전유·공용 breakdown</h2>',
@@ -3817,6 +3819,7 @@
           '<section class="section"><h2 class="section-title">면적 결과 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
           renderResultSummary(data),
           renderSum(data.sum || {}),
+          renderAreaConfirmedNudge(),
           data.note ? '<div class="note">' + esc(data.note) + '</div>' : '',
           data.floor_exclusive_note ? '<div class="note">' + esc(data.floor_exclusive_note) + '</div>' : '',
           '</section>',
@@ -3947,9 +3950,6 @@
           box("전유 m²", sum.exclusive_m2),
           box("공용 m²", sum.shared_m2),
           box("합계 m²", sum.total_m2),
-          box("전유 평", sum.exclusive_pyeong),
-          box("공용 평", sum.shared_pyeong),
-          box("합계 평", sum.total_pyeong),
           '</div>'
         ].join("");
       }
@@ -3965,9 +3965,12 @@
           resultSummaryCard("전유 면적", exclusive),
           resultSummaryCard("공용 면적", shared),
           resultSummaryCard("합계 평수", total),
-          '</div>',
-          '<div class="estimate-nudge"><strong>면적이 확인되었습니다.</strong><span>청소 견적의 면적 칸에 자동 입력되었습니다. 필요한 조건을 확인한 뒤 견적 계산을 눌러보세요.</span></div>'
+          '</div>'
         ].join("");
+      }
+
+      function renderAreaConfirmedNudge() {
+        return '<div class="estimate-nudge"><strong>면적이 확인되었습니다.</strong><span>청소 견적의 면적 칸에 자동 입력되었습니다. 필요한 조건을 확인한 뒤 견적 계산을 눌러보세요.</span></div>';
       }
 
       function resultSummaryCard(label, value) {

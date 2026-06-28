@@ -1,4 +1,4 @@
-const CACHE_NAME = "estimate-note-v23-20260628";
+const CACHE_NAME = "estimate-note-v24-20260628";
 const ASSETS = ["/manifest.webmanifest", "/icons/estimate-note.svg"];
 
 self.addEventListener("install", (event) => {
