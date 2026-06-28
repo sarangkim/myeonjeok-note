@@ -2852,6 +2852,7 @@
 
       var API_PATH = "/api/area";
       var PYEONG_M2 = 3.305785;
+      var AREA_CACHE_TTL_MS = 10 * 60 * 1000;
       var pageParams = new URLSearchParams(window.location.search);
       var isEmbedMode = pageParams.get("embed") === "1";
       var form = document.getElementById("form");
@@ -3192,6 +3193,10 @@
             }
           });
 
+          var cacheKey = "area-api:" + url.pathname + "?" + url.searchParams.toString();
+          var cached = readAreaCache(cacheKey);
+          if (cached) return cached;
+
           var response = await fetch(url.toString(), { method: "GET" });
           var data = await response.json().catch(function () {
             return null;
@@ -3199,10 +3204,32 @@
           if (!response.ok || !data || data.ok === false) {
             throw new Error((data && data.message) || "조회에 실패했습니다.");
           }
+          writeAreaCache(cacheKey, data);
           return data;
         } finally {
           setBusy(false);
         }
+      }
+
+      function readAreaCache(key) {
+        try {
+          var raw = sessionStorage.getItem(key);
+          if (!raw) return null;
+          var cached = JSON.parse(raw);
+          if (!cached || Date.now() - Number(cached.time || 0) > AREA_CACHE_TTL_MS) {
+            sessionStorage.removeItem(key);
+            return null;
+          }
+          return cached.data || null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function writeAreaCache(key, data) {
+        try {
+          sessionStorage.setItem(key, JSON.stringify({ time: Date.now(), data: data }));
+        } catch (error) {}
       }
 
       function initEmbedMode() {

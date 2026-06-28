@@ -4,6 +4,9 @@ const MAX_PAGES = 100;
 const PYEONG_M2 = 3.305785;
 const BLD_FETCH_TIMEOUT_MS = 8000;
 const BLD_FETCH_RETRIES = 1;
+const BLD_CACHE_TTL_MS = 10 * 60 * 1000;
+const BLD_CACHE_MAX = 80;
+const bldItemsCache = new Map();
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -255,6 +258,18 @@ function normalizeAddressInput(s) {
 }
 
 async function fetchBldItems(apiName, keys) {
+  const cacheKey = [
+    apiName,
+    keys.sigunguCd,
+    keys.bjdongCd,
+    keys.bun,
+    keys.ji,
+  ].join(":");
+  const cached = bldItemsCache.get(cacheKey);
+  if (cached && Date.now() - cached.time < BLD_CACHE_TTL_MS) {
+    return cached.items.map((item) => ({ ...item }));
+  }
+
   let allItems = [];
   let pageNo = 1;
   let totalCount = null;
@@ -283,7 +298,19 @@ async function fetchBldItems(apiName, keys) {
     pageNo += 1;
   }
 
+  rememberBldItems(cacheKey, allItems);
   return allItems;
+}
+
+function rememberBldItems(cacheKey, items) {
+  if (bldItemsCache.size >= BLD_CACHE_MAX) {
+    const oldestKey = bldItemsCache.keys().next().value;
+    if (oldestKey) bldItemsCache.delete(oldestKey);
+  }
+  bldItemsCache.set(cacheKey, {
+    time: Date.now(),
+    items: (items || []).map((item) => ({ ...item })),
+  });
 }
 
 async function fetchWithRetry(url, apiName) {
