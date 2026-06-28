@@ -12,6 +12,7 @@ const MESSAGES_TABLE = "field_request_messages";
 const REPORTS_TABLE = "board_reports";
 const POSTS_TABLE = "board_posts";
 const COMMENTS_TABLE = "board_comments";
+const INQUIRIES_TABLE = "estimate_inquiries";
 
 const PROFILE_COLUMNS = "user_id,email,display_name,company_name,phone,service_area,member_role,provider_status,provider_penalty_count,provider_suspended_at,provider_requested_at,updated_at";
 const REQUEST_COLUMNS = "id,requester_user_id,public_area,cleaning_type,space_type,address,road,jibun,floor,ho,status,created_at,updated_at";
@@ -20,6 +21,7 @@ const MESSAGE_COLUMNS = "id,request_id,application_id,sender_user_id,body,status
 const REPORT_COLUMNS = "id,target_type,post_id,comment_id,reporter_user_id,reason,status,created_at,updated_at";
 const POST_COLUMNS = "id,author_user_id,title,category,status,is_pinned,created_at,updated_at";
 const COMMENT_COLUMNS = "id,post_id,author_user_id,body,status,created_at,updated_at";
+const INQUIRY_COLUMNS = "id,name,phone,address,estimate_url,source,status,memo,created_at";
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -35,7 +37,7 @@ module.exports = async (req, res) => {
     if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
     if (!isAdminUser(user)) return res.status(403).json({ ok: false, message: "관리자만 볼 수 있습니다." });
 
-    const [providers, requests, applications, messages, reports, hiddenPosts, hiddenComments] = await Promise.all([
+    const [providers, requests, applications, messages, reports, hiddenPosts, hiddenComments, inquiries] = await Promise.all([
       optionalSupabaseRequest(`${PROFILES_TABLE}?member_role=eq.provider&select=${PROFILE_COLUMNS}&order=provider_requested_at.desc.nullslast,updated_at.desc&limit=120`),
       optionalSupabaseRequest(`${REQUESTS_TABLE}?select=${REQUEST_COLUMNS}&order=updated_at.desc&limit=60`),
       optionalSupabaseRequest(`${APPLICATIONS_TABLE}?select=${APPLICATION_COLUMNS}&order=updated_at.desc&limit=120`),
@@ -43,6 +45,7 @@ module.exports = async (req, res) => {
       optionalSupabaseRequest(`${REPORTS_TABLE}?status=eq.open&select=${REPORT_COLUMNS}&order=created_at.desc&limit=100`),
       optionalSupabaseRequest(`${POSTS_TABLE}?status=eq.hidden&select=${POST_COLUMNS}&order=updated_at.desc&limit=60`),
       optionalSupabaseRequest(`${COMMENTS_TABLE}?status=eq.hidden&select=${COMMENT_COLUMNS}&order=updated_at.desc&limit=60`),
+      optionalSupabaseRequest(`${INQUIRIES_TABLE}?select=${INQUIRY_COLUMNS}&order=created_at.desc&limit=30`),
     ]);
 
     const userIds = collectUserIds(providers, requests, applications, messages, reports, hiddenPosts, hiddenComments);
@@ -66,6 +69,7 @@ module.exports = async (req, res) => {
         pending_providers: pendingProviders.length,
         suspended_providers: suspendedProviders.filter((row) => row.provider_status === "suspended").length,
         recent_messages: messages.length,
+        new_inquiries: inquiries.filter((row) => row.status === "new").length,
       },
       field_requests: enrichRequests(requests.slice(0, 12), profiles),
       applications_needing_report: enrichApplications(needsReport.slice(0, 12), requestMap, profiles),
@@ -73,6 +77,7 @@ module.exports = async (req, res) => {
       board_reports: enrichReports(reports.slice(0, 12), profiles),
       hidden_posts: enrichAuthors(hiddenPosts.slice(0, 8), profiles),
       hidden_comments: enrichAuthors(hiddenComments.slice(0, 8), profiles),
+      inquiries: inquiries.slice(0, 8),
       pending_providers: pendingProviders.slice(0, 12).map((row) => normalizeProfile(row)),
       penalty_providers: suspendedProviders.slice(0, 12).map((row) => normalizeProfile(row)),
       penalty_applications: enrichApplications(penaltyApplications.slice(0, 12), requestMap, profiles),
