@@ -3247,15 +3247,25 @@
       }
 
       function loadEmbedAddressFromUrl() {
-        if (!isEmbedMode || !addressInput) return;
+        if (!addressInput) return;
         var address = pageParams.get("address") || pageParams.get("q") || "";
+        var floor = pageParams.get("floor") || "";
+        var ho = pageParams.get("ho") || "";
         address = address.trim();
         if (!address) return;
         addressInput.value = address;
+        if (ho) hoInput.value = ho;
         setSearchDetailsVisible(false);
         setStatus("주소를 조회 중입니다.");
-        setTimeout(function () {
-          loadSummary();
+        setTimeout(async function () {
+          await loadSummary();
+          if (floor) setFloorSelectValue(floor);
+          if (ho) {
+            hoInput.value = ho;
+            await search();
+          } else if (floor) {
+            await loadFloor(floorSelect.value || floor);
+          }
         }, 80);
       }
 
@@ -4196,6 +4206,41 @@
         shareBox.textContent = "";
         syncEstimateArea(data);
         if (data && data.input && (data.input.floor || data.input.ho)) setSearchDetailsVisible(true);
+        postEstimateResultToParent(data);
+      }
+
+      function postEstimateResultToParent(data) {
+        if (!isEmbedMode || !window.parent || window.parent === window || !data) return;
+        var input = data.input || {};
+        var payload = {
+          type: "estimate-note-result",
+          address: input.address || addressInput.value.trim() || "",
+          road: data.road || "",
+          jibun: data.jibun || "",
+          floor: input.floor || floorSelect.value || "",
+          ho: input.ho || hoInput.value.trim() || "",
+          areaPyeong: estimateAreaFromResult(data) || "",
+          url: buildResultUrl(data)
+        };
+        try {
+          window.parent.postMessage(payload, "*");
+        } catch (error) {}
+      }
+
+      function buildResultUrl(data) {
+        var input = (data && data.input) || {};
+        var url = new URL(window.location.origin + window.location.pathname);
+        url.searchParams.set("embed", "1");
+        var address = input.address || addressInput.value.trim();
+        var floor = input.floor || floorSelect.value || "";
+        var ho = input.ho || hoInput.value.trim() || "";
+        if (address) {
+          url.searchParams.set("address", address);
+          url.searchParams.set("q", address);
+        }
+        if (floor) url.searchParams.set("floor", floor);
+        if (ho) url.searchParams.set("ho", ho);
+        return url.toString();
       }
 
       function showShareLink(id) {
@@ -6444,7 +6489,7 @@
 
       function renderOpsInquiry(inquiry) {
         var title = [inquiry.name || "이름 없음", inquiry.phone || ""].filter(Boolean).join(" / ");
-        var detail = [inquiry.address || "", inquiryStatusLabel(inquiry.status), formatDateTime(inquiry.created_at)].filter(Boolean).join(" | ");
+        var detail = [inquiryAddressLabel(inquiry), inquiryStatusLabel(inquiry.status), formatDateTime(inquiry.created_at)].filter(Boolean).join(" | ");
         return '<li class="note-card"><strong>' + esc(title) + '</strong><span>' + esc(detail) + '</span><button class="chip" type="button" data-ops-action="inquiries">상담문의 보기</button></li>';
       }
 
@@ -6532,6 +6577,7 @@
           formatDateTime(inquiry.created_at),
           inquiry.source || ""
         ].filter(Boolean).join(" | ");
+        var addressLabel = inquiryAddressLabel(inquiry);
         var url = inquiry.estimate_url
           ? '<a class="chip" href="' + escAttr(inquiry.estimate_url) + '" target="_blank" rel="noopener noreferrer">견적 화면</a>'
           : "";
@@ -6539,7 +6585,7 @@
           '<li class="note-card">',
           '<strong>' + esc(title) + '</strong>',
           '<span>' + esc(detail) + '</span>',
-          inquiry.address ? '<span>' + esc(inquiry.address) + '</span>' : '',
+          addressLabel ? '<span>' + esc(addressLabel) + '</span>' : '',
           inquiry.memo ? '<span>' + esc(shortText(inquiry.memo, 180)) + '</span>' : '',
           '<div class="button-row">',
           url,
@@ -6549,6 +6595,27 @@
           '</div>',
           '</li>'
         ].join("");
+      }
+
+      function inquiryAddressLabel(inquiry) {
+        var address = String(inquiry && inquiry.address ? inquiry.address : "").trim();
+        var unit = inquiryUnitFromUrl(inquiry && inquiry.estimate_url);
+        if (!unit) return address;
+        if (address && address.indexOf(unit) !== -1) return address;
+        return [address, unit].filter(Boolean).join(" / ");
+      }
+
+      function inquiryUnitFromUrl(rawUrl) {
+        if (!rawUrl) return "";
+        try {
+          var url = new URL(rawUrl, window.location.origin);
+          var floor = String(url.searchParams.get("floor") || "").trim();
+          var ho = String(url.searchParams.get("ho") || "").trim();
+          if (ho) ho = ho.replace(/호$/, "") + "호";
+          return [floor, ho].filter(Boolean).join(" / ");
+        } catch (error) {
+          return "";
+        }
       }
 
       async function updateInquiryStatus(id, status) {
