@@ -1,4 +1,4 @@
-const BUILD = "2026-05-11-MYEONJEOK-NOTE-01";
+const BUILD = "2026-06-28-MYEONJEOK-NOTE-02";
 const BLD_PAGE_SIZE = 100;
 const MAX_PAGES = 100;
 const PYEONG_M2 = 3.305785;
@@ -120,8 +120,9 @@ module.exports = async (req, res) => {
       });
     }
 
-    const wantHoNorm = normalizeHo(hoInput);
-    if (!wantHoNorm) {
+    const wantHoNorms = parseHoInputList(hoInput);
+    const wantHoNorm = wantHoNorms[0] || "";
+    if (!wantHoNorms.length) {
       return res.status(400).json({
         ok: false,
         build: BUILD,
@@ -131,7 +132,7 @@ module.exports = async (req, res) => {
     }
 
     const pubItems = await fetchBldItems("getBrExposPubuseAreaInfo", keys);
-    const hoRows = findRowsByFloorAndHo(pubItems, effectiveFloorSpec, wantHoNorm);
+    const hoRows = findRowsByFloorAndHoList(pubItems, effectiveFloorSpec, wantHoNorms);
 
     if (hoRows.length) {
       return res.status(200).json(buildHoBreakdownResponse({
@@ -141,17 +142,20 @@ module.exports = async (req, res) => {
         juso,
         keys,
         wantHoNorm,
+        wantHoNorms,
         hoRows,
       }));
     }
 
     const exposItems = await fetchBldItems("getBrExposInfo", keys);
-    const target = findRowsByFloorAndHo(exposItems, effectiveFloorSpec, wantHoNorm)[0] || null;
+    const exposMatches = findRowsByFloorAndHoList(exposItems, effectiveFloorSpec, wantHoNorms);
+    const target = exposMatches[0] || null;
     const areaM2 = target ? toNumber(target.area) : 0;
 
     if (areaM2 > 0) {
+      const areaTotalM2 = round2(exposMatches.reduce((acc, it) => acc + toNumber(it.area), 0));
       const rawHoNm = String(target.hoNm || "").trim();
-      const mergedRange = expandHoRange(rawHoNm);
+      const mergedRange = wantHoNorms.length >= 2 ? wantHoNorms.map(Number) : expandHoRange(rawHoNm);
       const isMerged = mergedRange.length >= 2;
 
       return res.status(200).json({
@@ -172,7 +176,7 @@ module.exports = async (req, res) => {
             ? `입력한 호(${hoInput})는 대장상 "${rawHoNm}" 통합호에 포함되어 조회되었습니다.`
             : null,
         },
-        sum: areaSummary(areaM2, null),
+        sum: areaSummary(areaTotalM2, null),
         note: "전유/공용 breakdown 데이터가 없어서 전유부(getBrExposInfo) 면적으로 안내합니다.",
       });
     }
@@ -391,6 +395,17 @@ function normalizeHo(s) {
   return m ? m[0] : "";
 }
 
+function parseHoInputList(s) {
+  const raw = String(s || "").trim();
+  if (!raw) return [];
+  const expanded = expandHoRange(raw).map(String);
+  if (expanded.length >= 2 || raw.includes(",") || /[~-]/.test(raw)) {
+    return [...new Set(expanded)].sort((a, b) => Number(a) - Number(b));
+  }
+  const single = normalizeHo(raw);
+  return single ? [single] : [];
+}
+
 function normalizeFloor(s) {
   const m = String(s || "").match(/-?\d+/);
   return m ? String(Number(m[0])) : "";
@@ -465,6 +480,27 @@ function findRowsByFloorAndHo(items, floor, wantHoNorm) {
   });
 }
 
+function findRowsByFloorAndHoList(items, floor, hoNorms) {
+  const seen = new Set();
+  const rows = [];
+  for (const hoNorm of hoNorms || []) {
+    for (const row of findRowsByFloorAndHo(items, floor, hoNorm)) {
+      const key = [
+        row.flrNo || "",
+        row.hoNm || "",
+        row.exposPubuseGbCd || "",
+        row.mainPurpsCdNm || "",
+        row.etcPurps || "",
+        row.area || "",
+      ].join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push(row);
+    }
+  }
+  return rows;
+}
+
 function buildFloorList(flrItems) {
   const map = new Map();
   for (const it of flrItems || []) {
@@ -522,7 +558,7 @@ function areaSummary(exclusiveM2, sharedM2) {
   };
 }
 
-function buildHoBreakdownResponse({ address, floor, hoInput, juso, keys, wantHoNorm, hoRows }) {
+function buildHoBreakdownResponse({ address, floor, hoInput, juso, keys, wantHoNorm, wantHoNorms, hoRows }) {
   const breakdown = hoRows.map((x) => {
     const areaM2 = toNumber(x.area);
     return {
@@ -551,6 +587,7 @@ function buildHoBreakdownResponse({ address, floor, hoInput, juso, keys, wantHoN
     ho_matched: {
       want: hoInput,
       wantHoNorm,
+      wantHoNorms: wantHoNorms || [wantHoNorm].filter(Boolean),
       merged: mergedMatches.length > 0,
       matchedHoNm: mergedMatches[0] || matchedHoNmSamples[0] || null,
       range: mergedMatches[0] ? expandHoRange(mergedMatches[0]) : null,
