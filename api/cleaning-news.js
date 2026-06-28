@@ -6,9 +6,9 @@ let cachedPayload = null;
 
 const queries = [
   { keyword: "청소업체", category: "industry" },
-  { keyword: "사무실 청소", category: "industry" },
-  { keyword: "상가 청소", category: "industry" },
-  { keyword: "병원 청소", category: "industry" },
+  { keyword: "사무실청소 업체", category: "industry" },
+  { keyword: "상가청소 업체", category: "industry" },
+  { keyword: "병원청소 업체", category: "industry" },
   { keyword: "입주청소", category: "industry" },
   { keyword: "건물 청소 관리", category: "facility" },
   { keyword: "청소 위생관리", category: "facility" },
@@ -19,6 +19,18 @@ const queries = [
   { keyword: "자영업자 지원금", category: "support" },
   { keyword: "소상공인 정책자금", category: "support" },
   { keyword: "소상공인 고용지원금", category: "support" }
+];
+
+const categoryTerms = {
+  industry: ["청소", "청소업", "청소업체", "클리닝", "미화", "위생", "방역", "입주청소", "사무실청소", "상가청소", "병원청소"],
+  facility: ["청소", "시설관리", "시설 관리", "건물관리", "건물 관리", "위생", "환경정비", "환경 정비", "폐기물", "노후"],
+  aircon: ["에어컨", "냉난방", "공조", "실외기", "필터", "냉방"],
+  support: ["소상공인", "자영업자", "정책자금", "지원금", "고용지원", "정부지원", "보조금", "대출", "금융지원"]
+};
+
+const blockedTerms = [
+  "대통령", "연예", "드라마", "배우", "아이돌", "스타벅스 알바생", "알바생에게 벌어진", "100%실화",
+  "동생에게 싸주고", "관급공사", "연극영화과", "부모님은요", "스포츠", "야구", "축구"
 ];
 
 module.exports = async (request, response) => {
@@ -95,7 +107,7 @@ function extractItems(xml, query, category) {
     const link = sanitizeLink(rawLink);
 
     if (!title || !link) return null;
-    return {
+    const news = {
       title: trimText(title, 120),
       link,
       source: source || parseSource(title) || "Google News",
@@ -104,7 +116,40 @@ function extractItems(xml, query, category) {
       keyword: query,
       category
     };
+    return isRelevantNews(news) ? news : null;
   }).filter(Boolean);
+}
+
+function isRelevantNews(item) {
+  const text = normalizeNewsText([item.title, item.summary, item.source].filter(Boolean).join(" "));
+  const titleText = normalizeNewsText(item.title || "");
+  const summaryText = normalizeNewsText(item.summary || "");
+  if (!text) return false;
+
+  if (blockedTerms.some((term) => text.includes(normalizeNewsText(term)))) return false;
+
+  const terms = categoryTerms[item.category] || categoryTerms.industry;
+  const hasCategoryTerm = terms.some((term) => text.includes(normalizeNewsText(term)));
+  if (!hasCategoryTerm) return false;
+
+  if (item.category === "support") {
+    return ["소상공인", "자영업자", "지원금", "정책자금", "고용지원", "정부지원", "보조금", "대출"].some((term) => text.includes(term));
+  }
+
+  if (item.category === "aircon") return text.includes("에어컨") || text.includes("냉난방") || text.includes("공조");
+
+  return titleText.includes("청소") ||
+    titleText.includes("위생") ||
+    titleText.includes("시설관리") ||
+    titleText.includes("환경정비") ||
+    summaryText.includes("청소") ||
+    summaryText.includes("위생") ||
+    summaryText.includes("시설관리") ||
+    summaryText.includes("환경정비");
+}
+
+function normalizeNewsText(value) {
+  return String(value || "").toLowerCase().replace(/\s+/g, "");
 }
 
 function readTag(xml, tag) {

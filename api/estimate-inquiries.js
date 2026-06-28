@@ -25,7 +25,9 @@ module.exports = async (req, res) => {
       if (!isAdminUser(user)) return res.status(403).json({ ok: false, message: "관리자만 볼 수 있습니다." });
 
       const status = clamp(req.query.status, 40);
-      const statusFilter = status && status !== "all" ? `&status=eq.${encodeURIComponent(status)}` : "";
+      const statusFilter = status && status !== "all"
+        ? `&status=eq.${encodeURIComponent(status)}`
+        : "&status=neq.hidden";
       const rows = await supabaseRequest(`${TABLE}?select=${COLUMNS}${statusFilter}&order=created_at.desc&limit=120`, { method: "GET" });
       return res.status(200).json({ ok: true, inquiries: rows });
     }
