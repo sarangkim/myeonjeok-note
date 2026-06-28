@@ -1,18 +1,54 @@
 const TABLE = "estimate_inquiries";
 const COLUMNS = "id,name,phone,address,estimate_url,source,user_agent,referrer,status,memo,created_at";
+const DEFAULT_ADMIN_EMAILS = [
+  "77happycleaning@gmail.com",
+  "hangstore77@gmail.com",
+  "onlyghjr@gmail.com",
+  "contact@happycleaning.co.kr",
+];
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") {
+  if (!["GET", "POST", "PATCH"].includes(req.method)) {
     return res.status(405).json({ ok: false, message: "허용되지 않는 요청 방식입니다." });
   }
 
   try {
     assertSupabaseEnv();
+    if (req.method === "GET") {
+      const user = await getAuthUser(req);
+      if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
+      if (!isAdminUser(user)) return res.status(403).json({ ok: false, message: "관리자만 볼 수 있습니다." });
+
+      const status = clamp(req.query.status, 40);
+      const statusFilter = status && status !== "all" ? `&status=eq.${encodeURIComponent(status)}` : "";
+      const rows = await supabaseRequest(`${TABLE}?select=${COLUMNS}${statusFilter}&order=created_at.desc&limit=120`, { method: "GET" });
+      return res.status(200).json({ ok: true, inquiries: rows });
+    }
+
+    if (req.method === "PATCH") {
+      const user = await getAuthUser(req);
+      if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
+      if (!isAdminUser(user)) return res.status(403).json({ ok: false, message: "관리자만 처리할 수 있습니다." });
+
+      const body = await readJson(req);
+      const id = clamp(body.id || req.query.id, 40);
+      const status = clamp(body.status, 40);
+      if (!id) return res.status(400).json({ ok: false, message: "상담문의 ID가 필요합니다." });
+      if (!["new", "checking", "done", "hidden"].includes(status)) {
+        return res.status(400).json({ ok: false, message: "상태 값이 올바르지 않습니다." });
+      }
+      const updated = await supabaseRequest(`${TABLE}?id=eq.${encodeURIComponent(id)}&select=${COLUMNS}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      return res.status(200).json({ ok: true, inquiry: updated[0] || null });
+    }
+
     const body = await readJson(req);
     const name = clamp(body.name, 80);
     const phone = clamp(body.phone, 80);
@@ -82,6 +118,33 @@ async function supabaseRequest(path, options) {
     throw new Error(data?.message || data?.hint || `Supabase 오류: ${response.status}`);
   }
   return Array.isArray(data) ? data : [];
+}
+
+async function getAuthUser(req) {
+  const auth = String(req.headers.authorization || "");
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+
+  const base = supabaseBaseUrl();
+  const response = await fetch(`${base}/auth/v1/user`, {
+    headers: {
+      apikey: process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${match[1].trim()}`,
+    },
+  });
+  if (!response.ok) return null;
+  const user = await response.json();
+  return user?.id ? user : null;
+}
+
+function isAdminUser(user) {
+  const email = String(user?.email || "").toLowerCase();
+  const configured = String(process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  const admins = configured.length ? configured : DEFAULT_ADMIN_EMAILS;
+  return admins.includes(email);
 }
 
 async function sendTelegramNotification(inquiry) {

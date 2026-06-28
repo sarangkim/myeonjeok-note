@@ -2421,6 +2421,7 @@
           <button type="button" data-side-view="board">&#44172;&#49884;&#54032;</button>
           <button type="button" data-side-view="news">청소뉴스</button>
           <button type="button" data-side-view="adminOps" id="adminOpsMenu" hidden>운영관리</button>
+          <button type="button" data-side-view="adminInquiries" id="adminInquiriesMenu" hidden>상담문의 관리</button>
           <button type="button" data-side-view="adminProviders" id="adminProvidersMenu" hidden>&#50629;&#52404; &#49849;&#51064;</button>
         </div>
       </nav>
@@ -2761,11 +2762,28 @@
           <h2>운영관리</h2>
           <div class="button-row">
             <button class="secondary" id="refreshAdminOpsBtn" type="button">새로고침</button>
+            <button class="secondary" id="goAdminInquiriesBtn" type="button">상담문의 보기</button>
             <button class="secondary" id="goBoardModerationBtn" type="button">신고/숨김 보기</button>
             <button class="secondary" id="goProviderAdminBtn" type="button">업체 승인 보기</button>
           </div>
           <div class="note" id="adminOpsStatus" role="status" aria-live="polite"></div>
           <div class="ops-dashboard" id="adminOpsDashboard"></div>
+        </div>
+
+        <div class="side-panel" id="adminInquiriesPanel" hidden>
+          <h2>상담문의 관리</h2>
+          <div class="button-row">
+            <select id="adminInquiryStatusFilter" aria-label="상담문의 상태">
+              <option value="all">전체</option>
+              <option value="new">신규</option>
+              <option value="checking">확인중</option>
+              <option value="done">완료</option>
+              <option value="hidden">숨김</option>
+            </select>
+            <button class="secondary" id="refreshAdminInquiriesBtn" type="button">새로고침</button>
+          </div>
+          <div class="note" id="adminInquiriesStatus" role="status" aria-live="polite"></div>
+          <ul class="note-list" id="adminInquiriesList"></ul>
         </div>
 
         <div class="side-panel" id="adminProvidersPanel" hidden>
@@ -2971,10 +2989,17 @@
       var adminOpsMenu = document.getElementById("adminOpsMenu");
       var adminOpsPanel = document.getElementById("adminOpsPanel");
       var refreshAdminOpsBtn = document.getElementById("refreshAdminOpsBtn");
+      var goAdminInquiriesBtn = document.getElementById("goAdminInquiriesBtn");
       var goBoardModerationBtn = document.getElementById("goBoardModerationBtn");
       var goProviderAdminBtn = document.getElementById("goProviderAdminBtn");
       var adminOpsStatus = document.getElementById("adminOpsStatus");
       var adminOpsDashboard = document.getElementById("adminOpsDashboard");
+      var adminInquiriesMenu = document.getElementById("adminInquiriesMenu");
+      var adminInquiriesPanel = document.getElementById("adminInquiriesPanel");
+      var adminInquiryStatusFilter = document.getElementById("adminInquiryStatusFilter");
+      var refreshAdminInquiriesBtn = document.getElementById("refreshAdminInquiriesBtn");
+      var adminInquiriesStatus = document.getElementById("adminInquiriesStatus");
+      var adminInquiriesList = document.getElementById("adminInquiriesList");
       var defaultAdminEmails = ["77happycleaning@gmail.com", "hangstore77@gmail.com", "onlyghjr@gmail.com", "contact@happycleaning.co.kr"];
 
       var state = {
@@ -3117,11 +3142,14 @@
         selectSideView(button.getAttribute("data-provider-home-view"));
       });
       refreshAdminOpsBtn.addEventListener("click", loadAdminDashboard);
+      goAdminInquiriesBtn.addEventListener("click", function () { selectSideView("adminInquiries"); });
       goBoardModerationBtn.addEventListener("click", function () {
         selectSideView("board");
         loadBoardModeration();
       });
       goProviderAdminBtn.addEventListener("click", function () { selectSideView("adminProviders"); });
+      refreshAdminInquiriesBtn.addEventListener("click", loadAdminInquiries);
+      adminInquiryStatusFilter.addEventListener("change", loadAdminInquiries);
       loadPendingProvidersBtn.addEventListener("click", function () { loadProviderApprovals("pending"); });
       loadApprovedProvidersBtn.addEventListener("click", function () { loadProviderApprovals("approved"); });
       loadSuspendedProvidersBtn.addEventListener("click", function () { loadProviderApprovals("suspended"); });
@@ -4414,9 +4442,10 @@
         updateProviderHomeMenu();
         if (!adminProvidersMenu) return;
         if (adminOpsMenu) adminOpsMenu.hidden = !state.isAdmin;
+        if (adminInquiriesMenu) adminInquiriesMenu.hidden = !state.isAdmin;
         adminProvidersMenu.hidden = !state.isAdmin;
         if (boardModerationBtn) boardModerationBtn.hidden = !state.isAdmin;
-        if (!state.isAdmin && ((!adminProvidersPanel.hidden) || (adminOpsPanel && !adminOpsPanel.hidden))) selectSideView("notes");
+        if (!state.isAdmin && ((!adminProvidersPanel.hidden) || (adminOpsPanel && !adminOpsPanel.hidden) || (adminInquiriesPanel && !adminInquiriesPanel.hidden))) selectSideView("notes");
       }
 
       function updateProviderHomeMenu() {
@@ -4467,7 +4496,7 @@
 
       function selectSideView(view) {
         closeMainMenu();
-        if ((view === "adminProviders" || view === "adminOps") && !state.isAdmin) view = "notes";
+        if ((view === "adminProviders" || view === "adminOps" || view === "adminInquiries") && !state.isAdmin) view = "notes";
         if (view === "providerHome" && providerHomeMenu && providerHomeMenu.hidden) view = "notes";
         workspaceEl.classList.add("side-open");
         sideTabButtons.forEach(function (button) {
@@ -4480,6 +4509,7 @@
         var isBoard = view === "board";
         var isNews = view === "news";
         var isAdminOps = view === "adminOps";
+        var isAdminInquiries = view === "adminInquiries";
         var isAdminProviders = view === "adminProviders";
         notesPanel.hidden = !isNotes;
         providerHomePanel.hidden = !isProviderHome;
@@ -4487,9 +4517,10 @@
         boardPanel.hidden = !isBoard;
         newsPanel.hidden = !isNews;
         adminOpsPanel.hidden = !isAdminOps;
+        adminInquiriesPanel.hidden = !isAdminInquiries;
         adminProvidersPanel.hidden = !isAdminProviders;
-        requestsPanel.hidden = isNotes || isProviderHome || isEstimate || isBoard || isNews || isAdminOps || isAdminProviders;
-        fieldCreateBlock.hidden = isNotes || isProviderHome || isBoard || isNews || isAdminOps || isAdminProviders || view === "public" || view === "mine" || view === "applied";
+        requestsPanel.hidden = isNotes || isProviderHome || isEstimate || isBoard || isNews || isAdminOps || isAdminInquiries || isAdminProviders;
+        fieldCreateBlock.hidden = isNotes || isProviderHome || isBoard || isNews || isAdminOps || isAdminInquiries || isAdminProviders || view === "public" || view === "mine" || view === "applied";
 
         if (isProviderHome) {
           renderProviderHome();
@@ -4511,6 +4542,8 @@
           loadCleaningNews(false);
         } else if (isAdminOps) {
           loadAdminDashboard();
+        } else if (isAdminInquiries) {
+          loadAdminInquiries();
         } else if (isAdminProviders) {
           loadProviderApprovals("pending");
         }
@@ -6329,11 +6362,13 @@
         adminOpsDashboard.innerHTML = [
           renderOpsSummary(stats),
           renderOpsSection("처리 대기", [
+            ["신규 상담문의", stats.new_inquiries || 0, "inquiries"],
             ["승인 대기 업체", stats.pending_providers || 0, "providers"],
             ["미보고 신청", stats.report_needed || 0, "applied"],
             ["접수된 신고", stats.open_reports || 0, "moderation"],
             ["활동 제한 업체", stats.suspended_providers || 0, "providers"]
           ]),
+          renderOpsList("최근 상담문의", data.inquiries || [], renderOpsInquiry),
           renderOpsList("최근 현장요청", data.field_requests || [], renderOpsRequest),
           renderOpsList("쪽지 최근 내역", data.recent_messages || [], renderOpsMessage),
           renderOpsList("신고/숨김", (data.board_reports || []).concat(data.hidden_posts || [], data.hidden_comments || []), renderOpsModeration),
@@ -6351,7 +6386,8 @@
           ["미보고", stats.report_needed],
           ["신고", stats.open_reports],
           ["숨김", stats.hidden_items],
-          ["쪽지", stats.recent_messages]
+          ["쪽지", stats.recent_messages],
+          ["신규 상담", stats.new_inquiries]
         ];
         return '<div class="ops-summary-grid">' + items.map(function (item) {
           return '<div class="ops-summary-card"><span>' + esc(item[0]) + '</span><strong>' + esc(String(Number(item[1] || 0))) + '</strong></div>';
@@ -6374,6 +6410,12 @@
         var title = [request.cleaning_type, request.space_type].filter(Boolean).join(" / ") || "현장요청";
         var place = request.public_area || request.road || request.address || "";
         return '<li class="note-card"><strong>' + esc(title) + '</strong><span>' + esc([place, request.status, formatDateTime(request.updated_at || request.created_at)].filter(Boolean).join(" | ")) + '</span><span>' + esc(opsProfileName(profile)) + '</span></li>';
+      }
+
+      function renderOpsInquiry(inquiry) {
+        var title = [inquiry.name || "이름 없음", inquiry.phone || ""].filter(Boolean).join(" / ");
+        var detail = [inquiry.address || "", inquiryStatusLabel(inquiry.status), formatDateTime(inquiry.created_at)].filter(Boolean).join(" | ");
+        return '<li class="note-card"><strong>' + esc(title) + '</strong><span>' + esc(detail) + '</span><button class="chip" type="button" data-ops-action="inquiries">상담문의 보기</button></li>';
       }
 
       function renderOpsMessage(message) {
@@ -6399,6 +6441,8 @@
       function handleOpsAction(action) {
         if (action === "providers") {
           selectSideView("adminProviders");
+        } else if (action === "inquiries") {
+          selectSideView("adminInquiries");
         } else if (action === "moderation") {
           selectSideView("board");
           loadBoardModeration();
@@ -6417,6 +6461,91 @@
         if (status === "suspended") return "활동 제한";
         if (status === "rejected") return "거절";
         return "없음";
+      }
+
+      async function loadAdminInquiries() {
+        if (!state.isAdmin) {
+          adminInquiriesStatus.textContent = "관리자만 볼 수 있습니다.";
+          return;
+        }
+        var status = adminInquiryStatusFilter.value || "all";
+        adminInquiriesStatus.textContent = "상담문의를 불러오는 중입니다.";
+        adminInquiriesList.innerHTML = "";
+        try {
+          var response = await fetch("/api/estimate-inquiries?status=" + encodeURIComponent(status), { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "상담문의를 불러오지 못했습니다.");
+          renderAdminInquiries(data.inquiries || []);
+          adminInquiriesStatus.textContent = "상담문의를 불러왔습니다.";
+        } catch (error) {
+          adminInquiriesStatus.textContent = error.message;
+        }
+      }
+
+      function renderAdminInquiries(inquiries) {
+        if (!inquiries.length) {
+          adminInquiriesList.innerHTML = '<li class="note-card"><span>표시할 상담문의가 없습니다.</span></li>';
+          return;
+        }
+        adminInquiriesList.innerHTML = inquiries.map(renderAdminInquiryItem).join("");
+        adminInquiriesList.querySelectorAll("[data-inquiry-status]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            updateInquiryStatus(button.getAttribute("data-inquiry-id"), button.getAttribute("data-inquiry-status"));
+          });
+        });
+      }
+
+      function renderAdminInquiryItem(inquiry) {
+        var title = [inquiry.name || "이름 없음", inquiry.phone || ""].filter(Boolean).join(" / ");
+        var detail = [
+          inquiryStatusLabel(inquiry.status),
+          formatDateTime(inquiry.created_at),
+          inquiry.source || ""
+        ].filter(Boolean).join(" | ");
+        var url = inquiry.estimate_url
+          ? '<a class="chip" href="' + escAttr(inquiry.estimate_url) + '" target="_blank" rel="noopener noreferrer">견적 화면</a>'
+          : "";
+        return [
+          '<li class="note-card">',
+          '<strong>' + esc(title) + '</strong>',
+          '<span>' + esc(detail) + '</span>',
+          inquiry.address ? '<span>' + esc(inquiry.address) + '</span>' : '',
+          inquiry.memo ? '<span>' + esc(shortText(inquiry.memo, 180)) + '</span>' : '',
+          '<div class="button-row">',
+          url,
+          '<button class="chip" type="button" data-inquiry-id="' + escAttr(inquiry.id) + '" data-inquiry-status="checking">확인중</button>',
+          '<button class="chip" type="button" data-inquiry-id="' + escAttr(inquiry.id) + '" data-inquiry-status="done">완료</button>',
+          '<button class="chip" type="button" data-inquiry-id="' + escAttr(inquiry.id) + '" data-inquiry-status="hidden">숨김</button>',
+          '</div>',
+          '</li>'
+        ].join("");
+      }
+
+      async function updateInquiryStatus(id, status) {
+        if (!id || !status) return;
+        adminInquiriesStatus.textContent = "상담문의 상태를 변경하는 중입니다.";
+        try {
+          var response = await fetch("/api/estimate-inquiries", {
+            method: "PATCH",
+            headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+            body: JSON.stringify({ id: id, status: status })
+          });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "상태를 변경하지 못했습니다.");
+          adminInquiriesStatus.textContent = "상담문의 상태를 변경했습니다.";
+          loadAdminInquiries();
+          if (!adminOpsPanel.hidden) loadAdminDashboard();
+        } catch (error) {
+          adminInquiriesStatus.textContent = error.message;
+        }
+      }
+
+      function inquiryStatusLabel(status) {
+        if (status === "new") return "신규";
+        if (status === "checking") return "확인중";
+        if (status === "done") return "완료";
+        if (status === "hidden") return "숨김";
+        return status || "상태 없음";
       }
 
       async function getConfig() {
