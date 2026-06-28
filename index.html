@@ -596,6 +596,8 @@
     .search-panel {
       display: grid;
       gap: 14px;
+      position: relative;
+      z-index: 5;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
@@ -861,6 +863,8 @@
       color: var(--text);
       outline: none;
       padding: 9px 11px;
+      pointer-events: auto;
+      touch-action: manipulation;
     }
 
     input:focus,
@@ -2313,6 +2317,11 @@
         max-width: 100%;
       }
 
+      .search-panel input,
+      .search-panel select {
+        font-size: 16px;
+      }
+
       .workspace-resizer {
         display: none;
       }
@@ -3372,7 +3381,7 @@
           await loadSummary();
           floor = floorSelect.value;
         }
-        if (isMultiHoInput(ho) && !hasPrefetch(address)) {
+        if (isMultiHoInput(ho) && !floor && !hasPrefetch(address)) {
           await loadSummary();
           floor = floorSelect.value;
         }
@@ -3412,6 +3421,19 @@
           option.textContent = floor.label || floor.no + "층";
           floorSelect.appendChild(option);
         });
+      }
+
+      function setFloorSelectValue(value) {
+        if (!value) return;
+        floorSelect.value = value;
+        if (floorSelect.value) return;
+        var wantNo = normalizeFloor(value);
+        if (!wantNo) return;
+        var options = Array.prototype.slice.call(floorSelect.options || []);
+        var match = options.find(function (option) {
+          return normalizeFloor(option.value) === wantNo;
+        });
+        if (match) floorSelect.value = match.value;
       }
 
       function setBusy(isBusy) {
@@ -3719,7 +3741,7 @@
       }
 
       function renderFloor(data) {
-        if (data.input && data.input.floor) floorSelect.value = data.input.floor;
+        if (data.input && data.input.floor) setFloorSelectValue(data.input.floor);
         resultsEl.innerHTML = [
           renderAddress(data),
           '<section class="section"><h2 class="section-title">층 정보</h2>',
@@ -3739,8 +3761,8 @@
       }
 
       function renderHoBreakdown(data) {
-        if (data.input && data.input.floor) floorSelect.value = data.input.floor;
-        var floorData = hasPrefetch(addressInput.value.trim()) ? buildFloorFromPrefetch(data.input.floor) : null;
+        if (data.input && data.input.floor) setFloorSelectValue(data.input.floor);
+        var floorData = currentFloorData(data.input && data.input.floor);
         resultsEl.innerHTML = [
           renderAddress(data),
           '<section class="section"><h2 class="section-title">면적 합계 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
@@ -3760,8 +3782,8 @@
       }
 
       function renderFallback(data) {
-        if (data.input && data.input.floor) floorSelect.value = data.input.floor;
-        var floorData = hasPrefetch(addressInput.value.trim()) ? buildFloorFromPrefetch(data.input.floor) : null;
+        if (data.input && data.input.floor) setFloorSelectValue(data.input.floor);
+        var floorData = currentFloorData(data.input && data.input.floor);
         resultsEl.innerHTML = [
           renderAddress(data),
           '<section class="section"><h2 class="section-title">면적 결과 <span>' + esc((data.input && data.input.ho ? data.input.ho : hoInput.value) + "호") + '</span></h2>',
@@ -3986,10 +4008,19 @@
       function rerenderStickyHoList() {
         var section = resultsEl.querySelector("[data-ho-picker-section]");
         if (!section) return;
-        var floorData = hasPrefetch(addressInput.value.trim()) ? buildFloorFromPrefetch(floorSelect.value) : null;
+        var floorData = currentFloorData(floorSelect.value);
         if (!floorData) return;
         section.outerHTML = renderStickyHoList(floorData, hoInput.value);
         bindHoChips();
+      }
+
+      function currentFloorData(floor) {
+        if (state.currentResult && state.currentResult.mode === "floor") {
+          var currentFloor = state.currentResult.input && state.currentResult.input.floor;
+          if (!floor || normalizeFloor(currentFloor) === normalizeFloor(floor)) return state.currentResult;
+        }
+        if (hasPrefetch(addressInput.value.trim())) return buildFloorFromPrefetch(floor || floorSelect.value);
+        return null;
       }
 
       function remember(data, type) {
