@@ -24,6 +24,12 @@ module.exports = async (req, res) => {
       if (!user) return res.status(401).json({ ok: false, message: "로그인이 필요합니다." });
       if (!isAdminUser(user)) return res.status(403).json({ ok: false, message: "관리자만 볼 수 있습니다." });
 
+      const id = clamp(req.query.id, 40);
+      if (id) {
+        const rows = await supabaseRequest(`${TABLE}?select=${COLUMNS}&id=eq.${encodeURIComponent(id)}&limit=1`, { method: "GET" });
+        return res.status(200).json({ ok: true, inquiry: rows[0] || null });
+      }
+
       const status = clamp(req.query.status, 40);
       const statusFilter = status && status !== "all"
         ? `&status=eq.${encodeURIComponent(status)}`
@@ -57,14 +63,15 @@ module.exports = async (req, res) => {
     const floor = clamp(body.floor, 80);
     const ho = normalizeHo(clamp(body.ho, 80));
     const address = inquiryAddress(body.address, floor, ho);
-    const estimateUrl = inquiryEstimateUrl(body.estimateUrl || body.estimate_url, body.address, floor, ho);
+    const inquiryId = makeId(12);
+    const estimateUrl = inquiryEstimateUrl(body.estimateUrl || body.estimate_url, body.address, floor, ho, inquiryId);
 
     if (!name || !phone) {
       return res.status(400).json({ ok: false, message: "담당자 이름과 연락처가 필요합니다." });
     }
 
     const row = {
-      id: makeId(12),
+      id: inquiryId,
       name,
       phone,
       address: clamp(address, 500),
@@ -270,7 +277,7 @@ function inquiryAddress(address, floor, ho) {
   return [base, unit].filter(Boolean).join(" / ");
 }
 
-function inquiryEstimateUrl(rawUrl, address, floor, ho) {
+function inquiryEstimateUrl(rawUrl, address, floor, ho, inquiryId) {
   let url;
   try {
     url = new URL(String(rawUrl || "https://area.happycleaning.co.kr/?embed=1"));
@@ -285,6 +292,7 @@ function inquiryEstimateUrl(rawUrl, address, floor, ho) {
   }
   if (floor) url.searchParams.set("floor", floor);
   if (ho) url.searchParams.set("ho", ho.replace(/호$/, ""));
+  if (inquiryId) url.searchParams.set("inquiryId", inquiryId);
   return url.toString();
 }
 
