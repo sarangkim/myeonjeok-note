@@ -158,11 +158,16 @@ async function sendTelegramNotification(inquiry) {
   const chatId = String(process.env.TELEGRAM_CHAT_ID || "").trim();
   if (!token || !chatId) return { ok: false, skipped: true, message: "텔레그램 환경변수가 없습니다." };
 
+  const receivedAt = formatKoreanDateTime(inquiry.created_at);
   const text = [
     "새 상담 요청이 접수되었습니다.",
     `접수 ID: ${inquiry.id || "-"}`,
+    `접수 시각: ${receivedAt}`,
+    `확인 코드: ${makeInquiryHint(inquiry)}`,
+    `메모: ${inquiry.memo ? "있음" : "없음"}`,
+    `견적 화면: ${inquiry.estimate_url ? "있음" : "없음"}`,
     `출처: ${inquiry.source || "-"}`,
-    "개인정보는 Supabase estimate_inquiries 테이블에서 확인하세요.",
+    "자세한 개인정보는 견적노트 관리자 화면에서 확인하세요.",
   ].join("\n");
 
   const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -205,6 +210,32 @@ function readJson(req) {
 function clamp(value, max) {
   const text = String(value || "").trim();
   return text.length > max ? text.slice(0, max) : text;
+}
+
+function formatKoreanDateTime(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function makeInquiryHint(inquiry) {
+  const seed = [
+    inquiry.id,
+    inquiry.source,
+    inquiry.estimate_url ? "estimate" : "no-estimate",
+    inquiry.memo ? "memo" : "no-memo",
+  ].filter(Boolean).join("|");
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+  return `상담-${hash.toString(36).slice(0, 6).toUpperCase()}`;
 }
 
 function normalizeHo(value) {
