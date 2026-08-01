@@ -163,7 +163,9 @@ async function sendTelegramNotification(inquiry) {
     "새 상담 요청이 접수되었습니다.",
     `접수 ID: ${inquiry.id || "-"}`,
     `접수 시각: ${receivedAt}`,
-    `확인 코드: ${makeInquiryHint(inquiry)}`,
+    `전화 끝자리: ${phoneLast4(inquiry.phone)}`,
+    `지역: ${inquiryAreaHint(inquiry.address)}`,
+    `구분 코드: ${makeInquiryHint(inquiry)}`,
     `메모: ${inquiry.memo ? "있음" : "없음"}`,
     `견적 화면: ${inquiry.estimate_url ? "있음" : "없음"}`,
     `출처: ${inquiry.source || "-"}`,
@@ -236,6 +238,23 @@ function makeInquiryHint(inquiry) {
     hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
   }
   return `상담-${hash.toString(36).slice(0, 6).toUpperCase()}`;
+}
+
+function phoneLast4(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length >= 4 ? digits.slice(-4) : "-";
+}
+
+function inquiryAreaHint(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "-";
+
+  const parts = text.split(" / ")[0].split(" ").filter(Boolean);
+  const preferred = [...parts].reverse().find((part) => /(?:동|읍|면|가)$/.test(part));
+  if (preferred) return preferred;
+
+  const road = [...parts].reverse().find((part) => /(?:로|길)\d*$/i.test(part));
+  return road || parts.slice(-2).join(" ") || "-";
 }
 
 function normalizeHo(value) {
