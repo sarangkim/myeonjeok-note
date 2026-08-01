@@ -1719,6 +1719,38 @@
       min-height: 44px;
     }
 
+    .inquiry-context {
+      display: grid;
+      gap: 8px;
+      border: 1px solid rgba(38, 183, 232, 0.28);
+      border-radius: 14px;
+      background: rgba(242, 251, 255, 0.82);
+      padding: 14px;
+      color: var(--text);
+    }
+
+    .inquiry-context[hidden] {
+      display: none;
+    }
+
+    .inquiry-context strong {
+      color: var(--brand-strong);
+      font-size: 14px;
+    }
+
+    .inquiry-context .meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .inquiry-context p {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.55;
+    }
+
     .quote-actions {
       display: flex;
       flex-wrap: wrap;
@@ -2674,6 +2706,11 @@
             <div class="estimate-result" id="estimateResult">
               <div class="note">주소와 호실을 조회하면 면적이 자동으로 들어갑니다.</div>
             </div>
+            <div class="inquiry-context" id="inquiryContext" hidden>
+              <strong>상담 메모</strong>
+              <div class="meta" id="inquiryContextMeta"></div>
+              <p id="inquiryContextMemo">상담 메모를 불러오는 중입니다.</p>
+            </div>
             <div class="quote-preview" id="quotePreview" hidden>
               <div class="quote-edit-grid">
                 <label>
@@ -2922,6 +2959,9 @@
       var quoteLogoInput = document.getElementById("quoteLogoInput");
       var quoteStampInput = document.getElementById("quoteStampInput");
       var quoteSheet = document.getElementById("quoteSheet");
+      var inquiryContext = document.getElementById("inquiryContext");
+      var inquiryContextMeta = document.getElementById("inquiryContextMeta");
+      var inquiryContextMemo = document.getElementById("inquiryContextMemo");
       var accountButton = document.getElementById("accountButton");
       var accountMenu = document.getElementById("accountMenu");
       var accountEmail = document.getElementById("accountEmail");
@@ -3027,7 +3067,8 @@
         homeNewsLoaded: false,
         cleaningNewsLoaded: false,
         cleaningNewsItems: [],
-        cleaningNewsCategory: ""
+        cleaningNewsCategory: "",
+        inquiryContextLoaded: false
       };
 
       form.addEventListener("submit", function (event) {
@@ -5107,6 +5148,7 @@
           fillProfileForm();
           profileForm.hidden = true;
           renderAccountProfile();
+          loadInquiryContextFromUrl();
         } catch (error) {
           profileStatus.textContent = error.message;
         }
@@ -5144,6 +5186,7 @@
           profileForm.hidden = true;
           renderAccountProfile();
           profileStatus.textContent = "프로필을 저장했습니다.";
+          loadInquiryContextFromUrl();
         } catch (error) {
           profileStatus.textContent = error.message;
         }
@@ -6575,8 +6618,9 @@
           inquiry.source || ""
         ].filter(Boolean).join(" | ");
         var addressLabel = inquiryAddressLabel(inquiry);
-        var url = inquiry.estimate_url
-          ? '<a class="chip" href="' + escAttr(inquiry.estimate_url) + '" target="_blank" rel="noopener noreferrer">견적 화면</a>'
+        var estimateHref = inquiryEstimateHref(inquiry);
+        var url = estimateHref
+          ? '<a class="chip" href="' + escAttr(estimateHref) + '" target="_blank" rel="noopener noreferrer">견적 화면</a>'
           : "";
         return [
           '<li class="note-card">',
@@ -6592,6 +6636,17 @@
           '</div>',
           '</li>'
         ].join("");
+      }
+
+      function inquiryEstimateHref(inquiry) {
+        if (!inquiry || !inquiry.estimate_url) return "";
+        try {
+          var url = new URL(inquiry.estimate_url, window.location.origin);
+          if (inquiry.id && !url.searchParams.get("inquiryId")) url.searchParams.set("inquiryId", inquiry.id);
+          return url.toString();
+        } catch (error) {
+          return inquiry.estimate_url;
+        }
       }
 
       function inquiryAddressLabel(inquiry) {
@@ -6640,6 +6695,35 @@
         if (status === "done") return "완료";
         if (status === "hidden") return "숨김";
         return status || "상태 없음";
+      }
+
+      async function loadInquiryContextFromUrl() {
+        if (!inquiryContext || state.inquiryContextLoaded || !state.isAdmin) return;
+        var inquiryId = String(pageParams.get("inquiryId") || "").trim();
+        if (!inquiryId) return;
+
+        state.inquiryContextLoaded = true;
+        inquiryContext.hidden = false;
+        inquiryContextMeta.textContent = "";
+        inquiryContextMemo.textContent = "상담 메모를 불러오는 중입니다.";
+
+        try {
+          var response = await fetch("/api/estimate-inquiries?id=" + encodeURIComponent(inquiryId), { headers: authHeaders() });
+          var data = await response.json().catch(function () { return null; });
+          if (!response.ok || !data || data.ok === false) throw new Error((data && data.message) || "상담 메모를 불러오지 못했습니다.");
+          if (!data.inquiry) throw new Error("상담문의를 찾지 못했습니다.");
+
+          var inquiry = data.inquiry;
+          inquiryContextMeta.textContent = [
+            inquiry.name || "",
+            inquiry.phone || "",
+            formatDateTime(inquiry.created_at)
+          ].filter(Boolean).join(" | ");
+          inquiryContextMemo.textContent = inquiry.memo || "상담 메모가 없습니다.";
+        } catch (error) {
+          inquiryContextMeta.textContent = "";
+          inquiryContextMemo.textContent = error.message;
+        }
       }
 
       async function getConfig() {
