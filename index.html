@@ -1248,12 +1248,19 @@
     }
 
     body.embed-mode .topbar,
-    body.embed-mode .search-panel,
     body.embed-mode .intro-steps,
     body.embed-mode .home-news-panel,
     body.embed-mode .top-ad-slot,
     body.embed-mode .footer {
       display: none !important;
+    }
+
+    body.embed-mode .search-address-field {
+      display: none !important;
+    }
+
+    body.embed-mode .search-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     body.embed-mode #notesPanel {
@@ -2485,7 +2492,7 @@
 
     <form class="search-panel" id="form">
       <div class="search-grid">
-        <label>
+        <label class="search-address-field">
           주소
           <input id="address" name="address" autocomplete="street-address" placeholder="예: 서울 중구 세종대로 110">
         </label>
