@@ -286,12 +286,12 @@ async function fetchBldItems(apiName, keys) {
     const response = await fetchWithRetry(withServiceKey(url, process.env.BLD_KEY), apiName);
     if (!response.ok) throw new Error(`${apiName} HTTP 오류: ${response.status}`);
 
-    const xml = await response.text();
-    assertApiOk(xml, apiName);
-    const items = parseItems(xml).map(itemXmlToObj);
+    const text = await response.text();
+    const parsed = parseBldPayload(text, apiName);
+    const items = parsed.items;
     allItems = allItems.concat(items);
 
-    if (totalCount === null) totalCount = Number(getTagFromXml(xml, "totalCount")) || items.length;
+    if (totalCount === null) totalCount = parsed.totalCount || items.length;
     if (!items.length) break;
     if (totalCount > 0 && allItems.length >= totalCount) break;
     if (!totalCount && items.length < BLD_PAGE_SIZE) break;
@@ -363,6 +363,57 @@ function assertApiOk(xmlText, apiName) {
   if (String(xmlText || "").includes("API not found")) {
     throw new Error(`${apiName} 호출 실패: API를 찾을 수 없습니다.`);
   }
+}
+
+function parseBldPayload(text, apiName) {
+  const raw = String(text || "").trim();
+  if (raw.startsWith("{") || raw.startsWith("[")) {
+    return parseBldJsonPayload(raw, apiName);
+  }
+
+  assertApiOk(raw, apiName);
+  return {
+    items: parseItems(raw).map(itemXmlToObj),
+    totalCount: Number(getTagFromXml(raw, "totalCount")) || 0,
+  };
+}
+
+function parseBldJsonPayload(raw, apiName) {
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`${apiName} 응답 형식을 읽지 못했습니다.`);
+  }
+
+  const envelope = data.response || data;
+  const header = envelope.header || {};
+  const body = envelope.body || {};
+  const resultCode = String(header.resultCode || "").trim();
+  const resultMsg = String(header.resultMsg || "").trim();
+  if (resultCode && resultCode !== "00") {
+    throw new Error(`${apiName} 호출 실패: ${resultCode} ${resultMsg}`.trim());
+  }
+
+  return {
+    items: normalizeJsonItems(body.items && body.items.item),
+    totalCount: Number(body.totalCount) || 0,
+  };
+}
+
+function normalizeJsonItems(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(normalizeJsonItem);
+  if (typeof value === "object") return [normalizeJsonItem(value)];
+  return [];
+}
+
+function normalizeJsonItem(item) {
+  const o = {};
+  for (const [key, value] of Object.entries(item || {})) {
+    o[key] = value == null ? "" : String(value);
+  }
+  return o;
 }
 
 function parseItems(xmlText) {
