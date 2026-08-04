@@ -3976,9 +3976,10 @@
       function renderHoChips(hoList, activeHo) {
         if (!hoList.length) return '<div class="note">조회된 호 목록이 없습니다. 호를 직접 입력해 조회할 수 있습니다.</div>';
         var activeNorms = parseHoSelection(activeHo || hoInput.value);
+        var selectedNorms = currentHoSelection(activeHo);
         return '<div class="chips">' + hoList.map(function (ho) {
           var norm = normalizeHo(ho);
-          var isSelected = state.selectedHoNorms.indexOf(norm) !== -1;
+          var isSelected = selectedNorms.indexOf(norm) !== -1;
           var isActive = !isSelected && activeNorms.length === 1 && norm === activeNorms[0];
           var inRange = isSelected || (activeNorms.length > 1 && activeNorms.indexOf(norm) !== -1);
           var className = isActive ? " active" : (inRange ? " in-range" : "");
@@ -3997,7 +3998,7 @@
         ].join("");
       }
       function renderHoPickerTools() {
-        var count = state.selectedHoNorms.length;
+        var count = currentHoSelection().length;
         var noteText = count ? count + "\uAC1C \uD638 \uC120\uD0DD\uB428" : "\uC5EC\uB7EC \uD638\uB97C \uAC19\uC774 \uB20C\uB7EC \uD569\uC0B0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
         var mergeLabel = count === 1 ? "\uC120\uD0DD\uD55C \uD638 \uC870\uD68C" : "\uC120\uD0DD\uD55C \uD638 \uD569\uC0B0";
         return [
@@ -4095,10 +4096,17 @@
         });
       }
 
+      function currentHoSelection(activeHo) {
+        return uniqueSortedHoNorms([].concat(
+          state.selectedHoNorms || [],
+          parseHoSelection(activeHo || hoInput.value)
+        ));
+      }
+
       function toggleSelectedHo(ho) {
         var norm = normalizeHo(ho);
         if (!norm) return;
-        var next = state.selectedHoNorms.slice();
+        var next = currentHoSelection();
         var index = next.indexOf(norm);
         if (index === -1) next.push(norm);
         else next.splice(index, 1);
@@ -4114,8 +4122,10 @@
       }
 
       function searchSelectedHo() {
-        if (!state.selectedHoNorms.length) return;
-        hoInput.value = formatHoSelection(state.selectedHoNorms);
+        var selected = currentHoSelection();
+        if (!selected.length) return;
+        state.selectedHoNorms = selected;
+        hoInput.value = formatHoSelection(selected);
         search();
       }
 
