@@ -2449,8 +2449,8 @@
         <button class="menu-button secondary" id="mainMenuButton" type="button" aria-label="&#47700;&#45684; &#50676;&#44592;" aria-expanded="false">&#9776;</button>
         <div class="main-menu" id="mainMenu" hidden>
           <button type="button" data-side-view="providerHome" id="providerHomeMenu" hidden>업체홈</button>
-          <button class="active" type="button" data-side-view="notes">&#45236; &#47700;&#47784;</button>
-          <button type="button" data-side-view="estimate">&#44204;&#51201;</button>
+          <button type="button" data-side-view="notes">&#45236; &#47700;&#47784;</button>
+          <button class="active" type="button" data-side-view="estimate">&#44204;&#51201;</button>
           <button type="button" data-side-view="public">현장요청 찾기</button>
           <button type="button" data-side-view="mine">내가 올린 요청</button>
           <button type="button" data-side-view="applied">내가 지원한 요청</button>
@@ -2552,7 +2552,7 @@
           <ul class="note-list" id="providerHomeList"></ul>
         </div>
 
-        <div class="side-panel" id="notesPanel">
+        <div class="side-panel" id="notesPanel" hidden>
           <h2>내 메모</h2>
           <div class="memo-box">
             <div id="loginForm" hidden>
@@ -2586,7 +2586,7 @@
           <div class="note" id="emptyNote">아직 저장된 조회가 없습니다.</div>
         </div>
 
-        <div class="side-panel" id="estimatePanel" hidden>
+        <div class="side-panel" id="estimatePanel">
           <h2>청소 견적</h2>
           <div class="estimate-form">
             <label>
@@ -3439,15 +3439,16 @@
           state.lastAddress = address;
           state.prefetch = data;
           setFloors(data.floors || []);
-          setSearchDetailsVisible((data.floors || []).length > 0);
+          setSearchDetailsVisible(true);
           renderSummary(data);
           hideIntroSteps();
           hideHomeNews();
           remember(data, "층 목록");
           setCurrentResult(data);
+          selectSideView("estimate");
           prefillFieldRequest(data);
           renderMap(data);
-          setStatus("층 목록을 불러왔습니다.");
+          setStatus((data.floors || []).length ? "층 목록을 불러왔습니다." : "공공데이터에서 조회된 층 목록이 없습니다. 주소 표기를 바꿔 다시 조회해보세요.", (data.floors || []).length ? "" : "warn");
         } catch (error) {
           setStatus(error.message, "error");
         }
@@ -3523,7 +3524,7 @@
         floorSelect.innerHTML = "";
         var first = document.createElement("option");
         first.value = "";
-        first.textContent = state.floors.length ? "층 선택" : "주소 조회 후 선택";
+        first.textContent = state.floors.length ? "층 선택" : "조회된 층 없음";
         floorSelect.appendChild(first);
         state.floors.forEach(function (floor) {
           var option = document.createElement("option");
