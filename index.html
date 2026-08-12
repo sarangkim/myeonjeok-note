@@ -2030,6 +2030,64 @@
       font-size: 12px;
     }
 
+    .inquiry-card {
+      display: grid;
+      gap: 9px;
+    }
+
+    .inquiry-card-head,
+    .inquiry-meta-grid {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .inquiry-card-head strong {
+      display: inline;
+      font-size: 15px;
+    }
+
+    .status-pill,
+    .inquiry-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border: 1px solid rgba(38, 183, 232, 0.22);
+      border-radius: 999px;
+      background: rgba(232, 248, 255, 0.78);
+      color: var(--brand-strong);
+      font-size: 12px;
+      font-weight: 850;
+      padding: 5px 9px;
+    }
+
+    .status-pill.checking {
+      background: #fff8e8;
+      border-color: #f3d08a;
+      color: #936200;
+    }
+
+    .status-pill.done {
+      background: #ecfbf3;
+      border-color: #aee6c4;
+      color: #16734a;
+    }
+
+    .status-pill.hidden-state {
+      background: #f4f6f8;
+      border-color: #d7dee5;
+      color: #66737f;
+    }
+
+    .inquiry-summary {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
     .ops-dashboard {
       display: grid;
       gap: 14px;
@@ -6629,23 +6687,36 @@
       }
 
       function renderAdminInquiryItem(inquiry) {
-        var title = [inquiry.name || "이름 없음", inquiry.phone || ""].filter(Boolean).join(" / ");
-        var detail = [
-          inquiryStatusLabel(inquiry.status),
-          formatDateTime(inquiry.created_at),
-          inquiry.source || ""
-        ].filter(Boolean).join(" | ");
+        var name = inquiry.name || "이름 없음";
+        var phone = phoneLast4(inquiry.phone);
+        var status = inquiry.status || "new";
+        var statusClass = status === "hidden" ? "hidden-state" : status;
         var addressLabel = inquiryAddressLabel(inquiry);
+        var areaHint = inquiryAreaHint(addressLabel);
+        var unit = inquiryUnitFromUrl(inquiry && inquiry.estimate_url);
         var estimateHref = inquiryEstimateHref(inquiry);
+        var memoText = String(inquiry.memo || "").trim();
+        var meta = [
+          areaHint ? "지역 " + areaHint : "",
+          unit ? "층/호 " + unit : "",
+          memoText ? "메모 있음" : "메모 없음",
+          estimateHref ? "견적 화면 있음" : "견적 화면 없음",
+          inquiry.source || ""
+        ].filter(Boolean);
         var url = estimateHref
           ? '<a class="chip" href="' + escAttr(estimateHref) + '" target="_blank" rel="noopener noreferrer">견적 화면</a>'
           : "";
         return [
-          '<li class="note-card">',
-          '<strong>' + esc(title) + '</strong>',
-          '<span>' + esc(detail) + '</span>',
-          addressLabel ? '<span>' + esc(addressLabel) + '</span>' : '',
-          inquiry.memo ? '<span>' + esc(shortText(inquiry.memo, 180)) + '</span>' : '',
+          '<li class="note-card inquiry-card">',
+          '<div class="inquiry-card-head">',
+          '<span class="status-pill ' + escAttr(statusClass) + '">' + esc(inquiryStatusLabel(status)) + '</span>',
+          '<strong>' + esc(name) + '</strong>',
+          '<span class="inquiry-meta-pill">끝자리 ' + esc(phone) + '</span>',
+          '<span class="inquiry-meta-pill">' + esc(formatDateTime(inquiry.created_at)) + '</span>',
+          '</div>',
+          meta.length ? '<div class="inquiry-meta-grid">' + meta.map(function (item) { return '<span class="inquiry-meta-pill">' + esc(item) + '</span>'; }).join("") + '</div>' : '',
+          addressLabel ? '<span class="inquiry-summary">' + esc(addressLabel) + '</span>' : '',
+          memoText ? '<span class="inquiry-summary">' + esc(shortText(memoText, 220)) + '</span>' : '',
           '<div class="button-row">',
           url,
           '<button class="chip" type="button" data-inquiry-id="' + escAttr(inquiry.id) + '" data-inquiry-status="checking">확인중</button>',
@@ -6673,6 +6744,25 @@
         if (!unit) return address;
         if (address && address.indexOf(unit) !== -1) return address;
         return [address, unit].filter(Boolean).join(" / ");
+      }
+
+      function phoneLast4(value) {
+        var digits = String(value || "").replace(/\D/g, "");
+        return digits.length >= 4 ? digits.slice(-4) : "-";
+      }
+
+      function inquiryAreaHint(value) {
+        var text = String(value || "").replace(/\s+/g, " ").trim();
+        if (!text) return "";
+        var parts = text.split(" / ")[0].split(" ").filter(Boolean);
+        var preferred = parts.slice().reverse().find(function (part) {
+          return /(?:동|읍|면|가)$/.test(part);
+        });
+        if (preferred) return preferred;
+        var road = parts.slice().reverse().find(function (part) {
+          return /(?:로|길)\d*$/i.test(part);
+        });
+        return road || parts.slice(-2).join(" ");
       }
 
       function inquiryUnitFromUrl(rawUrl) {
