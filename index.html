@@ -1635,6 +1635,18 @@
       font-size: 15px;
     }
 
+    .access-guide {
+      display: grid;
+      gap: 7px;
+      margin: 10px 0;
+    }
+
+    .access-guide span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
     table {
       font-size: 14px;
     }
@@ -2634,6 +2646,12 @@
             </div>
             <button class="secondary" id="logoutBtn" type="button" hidden>로그아웃</button>
             <div class="note" id="authStatus">로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.</div>
+            <div class="note-card access-guide" id="accessGuide">
+              <strong>로그인 없이 바로 가능</strong>
+              <span>주소 조회, 평수 확인, 예상 청소견적 계산</span>
+              <strong>로그인이 필요한 기능</strong>
+              <span>메모 저장, 게시판 작성, 현장요청 등록, 쪽지, 견적서 저장</span>
+            </div>
             <ul class="note-list" id="myNoteList"></ul>
           </div>
           <h2>공유 메모</h2>
@@ -2997,6 +3015,7 @@
       var googleLoginBtn = document.getElementById("googleLoginBtn");
       var logoutBtn = document.getElementById("logoutBtn");
       var authStatus = document.getElementById("authStatus");
+      var accessGuide = document.getElementById("accessGuide");
       var myNoteList = document.getElementById("myNoteList");
       var loginForm = document.getElementById("loginForm");
       var estimatePanel = document.getElementById("estimatePanel");
@@ -4655,6 +4674,7 @@
         authStatus.textContent = user
           ? ""
           : "로그인하면 저장한 메모를 계정에서 다시 볼 수 있습니다.";
+        if (accessGuide) accessGuide.hidden = !!user;
         updateFieldRewardVisibility();
         updateQuoteControls();
         renderAccountProfile();
