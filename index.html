@@ -3480,10 +3480,10 @@
           return;
         }
         if (isIosSafari()) {
-          setStatus("아이폰에서는 공유 버튼을 누른 뒤 '홈 화면에 추가'를 선택해주세요.", "warn");
+          openInstallHelp("ios");
           return;
         }
-        setStatus("브라우저 메뉴에서 '앱 설치' 또는 '홈 화면에 추가'를 선택해주세요.", "warn");
+        openInstallHelp("browser");
       }
 
       function isStandaloneApp() {
@@ -3734,6 +3734,13 @@
         policyModal.hidden = true;
       }
 
+      function openInstallHelp(type) {
+        var isIos = type === "ios";
+        policyTitle.textContent = "앱 추가 안내";
+        policyBody.innerHTML = isIos ? installIosHtml() : installBrowserHtml();
+        policyModal.hidden = false;
+      }
+
       function privacyHtml() {
         return [
           '<p>견적노트는 주소 기반 평수 조회, 메모 저장, 현장 견적 요청, 게시판 제공을 위해 필요한 최소한의 개인정보를 처리합니다.</p>',
@@ -3763,6 +3770,25 @@
           '<p>운영자는 부적절한 게시글, 댓글, 현장 요청을 숨김 또는 삭제할 수 있습니다.</p>',
           '<h3>사업자 정보</h3>',
           '<p>개인정보 보호책임자: 행복한청소<br>사업자등록번호: 575-54-00467<br>주소: 서울시 강서구 허준로 198<br>문의: contact@happycleaning.co.kr</p>'
+        ].join("");
+      }
+
+      function installIosHtml() {
+        return [
+          '<p>아이폰과 아이패드는 브라우저 공유 메뉴에서 홈 화면 바로가기를 추가할 수 있습니다.</p>',
+          '<h3>iPhone / iPad</h3>',
+          '<ol><li>Safari 하단 또는 상단의 공유 버튼을 누릅니다.</li><li>목록에서 홈 화면에 추가를 선택합니다.</li><li>이름이 견적노트인지 확인한 뒤 추가를 누릅니다.</li></ol>',
+          '<p>Chrome 앱에서는 이 메뉴가 보이지 않을 수 있습니다. 이 경우 Safari에서 area.happycleaning.co.kr을 열어 진행해주세요.</p>'
+        ].join("");
+      }
+
+      function installBrowserHtml() {
+        return [
+          '<p>브라우저가 자동 설치창을 제공하지 않는 경우 메뉴에서 직접 추가할 수 있습니다.</p>',
+          '<h3>Android Chrome / Edge</h3>',
+          '<ol><li>오른쪽 위 메뉴 버튼을 누릅니다.</li><li>앱 설치 또는 홈 화면에 추가를 선택합니다.</li><li>견적노트를 추가하면 홈 화면에서 바로 열 수 있습니다.</li></ol>',
+          '<h3>데스크탑 Chrome / Edge</h3>',
+          '<p>주소창 오른쪽의 설치 아이콘을 누르거나 브라우저 메뉴에서 앱 설치를 선택해주세요.</p>'
         ].join("");
       }
 
