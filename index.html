@@ -837,6 +837,17 @@
       color: var(--brand-strong);
     }
 
+    .estimate-nudge-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .estimate-nudge-actions .chip {
+      background: rgba(255, 255, 255, 0.86);
+    }
+
     .search-grid {
       display: grid;
       grid-template-columns: minmax(280px, 1.5fr) minmax(150px, 0.45fr) minmax(150px, 0.45fr);
@@ -3927,6 +3938,7 @@
           renderFieldRequestMount()
         ].join("");
         bindHoChips();
+        bindFlowActions();
         mountFieldCreateBlock(data);
       }
 
@@ -3949,6 +3961,7 @@
           renderFieldRequestMount()
         ].join("");
         bindHoChips();
+        bindFlowActions();
         mountFieldCreateBlock(data);
       }
 
@@ -3968,6 +3981,7 @@
           renderFieldRequestMount()
         ].join("");
         bindHoChips();
+        bindFlowActions();
         mountFieldCreateBlock(data);
       }
       function renderFieldRequestMount() {
@@ -4112,7 +4126,16 @@
       }
 
       function renderAreaConfirmedNudge() {
-        return '<div class="estimate-nudge"><strong>면적이 확인되었습니다.</strong><span>청소 견적의 면적 칸에 자동 입력되었습니다. 필요한 조건을 확인한 뒤 견적 계산을 눌러보세요.</span></div>';
+        var message = isEmbedMode
+          ? "청소 견적의 면적 칸에 자동 입력되었습니다. 필요한 조건을 확인한 뒤 견적 계산을 눌러보세요."
+          : "청소 견적의 면적 칸에 자동 입력되었습니다. 견적을 계산하거나 이 주소로 현장요청을 등록할 수 있습니다.";
+        var actions = isEmbedMode ? "" : [
+          '<div class="estimate-nudge-actions">',
+          '<button class="chip" type="button" data-flow-action="estimate">견적 계산으로 이동</button>',
+          '<button class="chip" type="button" data-flow-action="request">현장요청 등록으로 이동</button>',
+          '</div>'
+        ].join("");
+        return '<div class="estimate-nudge"><strong>면적이 확인되었습니다.</strong><span>' + esc(message) + '</span>' + actions + '</div>';
       }
 
       function resultSummaryCard(label, value) {
@@ -4152,6 +4175,30 @@
         resultsEl.querySelectorAll("[data-clear-selected-ho]").forEach(function (button) {
           button.addEventListener("click", clearSelectedHo);
         });
+      }
+
+      function bindFlowActions() {
+        resultsEl.querySelectorAll("[data-flow-action]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            handleFlowAction(button.getAttribute("data-flow-action"));
+          });
+        });
+      }
+
+      function handleFlowAction(action) {
+        if (action === "estimate") {
+          selectSideView("estimate");
+          estimatePanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          calculateEstimateBtn.focus({ preventScroll: true });
+          return;
+        }
+        if (action === "request") {
+          var mount = document.getElementById("fieldCreateMount");
+          if (!mount) return;
+          mount.scrollIntoView({ behavior: "smooth", block: "start" });
+          var first = mount.querySelector("input, textarea, button");
+          if (first) first.focus({ preventScroll: true });
+        }
       }
 
       function currentHoSelection(activeHo) {
