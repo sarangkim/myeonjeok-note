@@ -2103,6 +2103,18 @@
       color: #66737f;
     }
 
+    .inquiry-meta-pill.important {
+      border-color: rgba(8, 120, 184, 0.34);
+      background: rgba(209, 242, 255, 0.92);
+      color: #075985;
+    }
+
+    .inquiry-meta-pill.muted {
+      border-color: #d7dee5;
+      background: rgba(244, 246, 248, 0.78);
+      color: #73808c;
+    }
+
     .inquiry-summary {
       display: block;
       color: var(--muted);
@@ -6793,13 +6805,12 @@
         var unit = inquiryUnitFromUrl(inquiry && inquiry.estimate_url);
         var estimateHref = inquiryEstimateHref(inquiry);
         var memoText = String(inquiry.memo || "").trim();
-        var meta = [
-          areaHint ? "지역 " + areaHint : "",
-          unit ? "층/호 " + unit : "",
-          memoText ? "메모 있음" : "메모 없음",
-          estimateHref ? "견적 화면 있음" : "견적 화면 없음",
-          inquiry.source || ""
-        ].filter(Boolean);
+        var meta = [];
+        if (areaHint) meta.push({ label: "지역 " + areaHint });
+        if (unit) meta.push({ label: "층/호 " + unit });
+        meta.push({ label: memoText ? "메모 있음" : "메모 없음", className: memoText ? "important" : "muted" });
+        meta.push({ label: estimateHref ? "견적 화면 있음" : "견적 화면 없음", className: estimateHref ? "important" : "muted" });
+        if (inquiry.source) meta.push({ label: inquiry.source });
         var url = estimateHref
           ? '<a class="chip" href="' + escAttr(estimateHref) + '" target="_blank" rel="noopener noreferrer">견적 화면</a>'
           : "";
@@ -6811,7 +6822,7 @@
           '<span class="inquiry-meta-pill">끝자리 ' + esc(phone) + '</span>',
           '<span class="inquiry-meta-pill">' + esc(formatDateTime(inquiry.created_at)) + '</span>',
           '</div>',
-          meta.length ? '<div class="inquiry-meta-grid">' + meta.map(function (item) { return '<span class="inquiry-meta-pill">' + esc(item) + '</span>'; }).join("") + '</div>' : '',
+          meta.length ? '<div class="inquiry-meta-grid">' + meta.map(function (item) { return '<span class="inquiry-meta-pill ' + escAttr(item.className || "") + '">' + esc(item.label) + '</span>'; }).join("") + '</div>' : '',
           addressLabel ? '<span class="inquiry-summary">' + esc(addressLabel) + '</span>' : '',
           memoText ? '<span class="inquiry-summary">' + esc(shortText(memoText, 220)) + '</span>' : '',
           '<div class="button-row">',
