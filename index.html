@@ -2942,6 +2942,7 @@
 
         <div class="side-panel" id="requestsPanel" hidden>
           <h2 id="requestsPanelTitle">현장요청 찾기</h2>
+          <div class="note" id="requestsPanelHelp">공개된 현장요청은 누구나 볼 수 있고, 방문 신청은 승인된 청소업체만 가능합니다.</div>
           <div class="field-form">
             <div class="field-create" id="fieldCreateBlock" hidden>
               <input id="fieldPublicArea" placeholder="공개 위치 예: 서울 강서구 마곡동">
@@ -3117,6 +3118,7 @@
       var notesPanel = document.getElementById("notesPanel");
       var requestsPanel = document.getElementById("requestsPanel");
       var requestsPanelTitle = document.getElementById("requestsPanelTitle");
+      var requestsPanelHelp = document.getElementById("requestsPanelHelp");
       var fieldCreateBlock = document.getElementById("fieldCreateBlock");
       var boardPanel = document.getElementById("boardPanel");
       var boardCategoryFilter = document.getElementById("boardCategoryFilter");
@@ -4826,12 +4828,15 @@
           renderEstimate();
         } else if (view === "public") {
           requestsPanelTitle.textContent = "현장요청 찾기";
+          if (requestsPanelHelp) requestsPanelHelp.textContent = "공개된 현장요청은 누구나 볼 수 있고, 방문 신청은 승인된 청소업체만 가능합니다.";
           loadFieldRequests();
         } else if (view === "mine") {
           requestsPanelTitle.textContent = "내가 올린 요청";
+          if (requestsPanelHelp) requestsPanelHelp.textContent = "내가 등록한 현장요청과 신청자, 상세주소 공개 상태를 확인합니다.";
           loadMyFieldRequests();
         } else if (view === "applied") {
           requestsPanelTitle.textContent = "내가 지원한 요청";
+          if (requestsPanelHelp) requestsPanelHelp.textContent = "내가 방문 신청한 요청의 승인 여부, 상세주소, 쪽지, 방문/견적 보고를 확인합니다.";
           loadAppliedFieldRequests();
         } else if (isBoard) {
           loadBoardPosts();
