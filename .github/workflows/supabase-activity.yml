@@ -1,0 +1,54 @@
+name: Keep Supabase Active
+
+on:
+  schedule:
+    # Four real database reads per day, away from GitHub Actions' busy :00 window.
+    # Public repositories need repository activity at least once every 60 days
+    # or GitHub may automatically disable scheduled workflows.
+    - cron: "17 0,6,12,18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-activity
+  cancel-in-progress: false
+
+jobs:
+  query-production-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query Supabase through the production app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          endpoint="https://area.happycleaning.co.kr/api/field-requests?keepalive=github-actions&run_id=${GITHUB_RUN_ID}&attempt=${GITHUB_RUN_ATTEMPT}"
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+
+          http_code="$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --retry 3 \
+            --retry-all-errors \
+            --connect-timeout 10 \
+            --max-time 45 \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            "$endpoint")"
+
+          if [[ "$http_code" != "200" ]]; then
+            echo "Keepalive request failed with HTTP $http_code."
+            exit 1
+          fi
+
+          if ! jq -e '.ok == true' "$response_file" > /dev/null; then
+            echo "Keepalive response did not confirm a successful database query."
+            exit 1
+          fi
+
+          echo "Supabase database activity recorded successfully."
