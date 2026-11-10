@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/area.js": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "regions": ["icn1"]
     }
   },
   "headers": [
