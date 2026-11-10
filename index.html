@@ -3347,12 +3347,23 @@
           var cached = readAreaCache(cacheKey);
           if (cached) return cached;
 
-          var response = await fetch(url.toString(), { method: "GET" });
-          var data = await response.json().catch(function () {
-            return null;
-          });
-          if (!response.ok || !data || data.ok === false) {
-            throw new Error((data && data.message) || "조회에 실패했습니다.");
+          var data = null;
+          for (var attempt = 0; attempt < 2; attempt += 1) {
+            var requestUrl = new URL(url.toString());
+            if (attempt > 0) requestUrl.searchParams.set("_retry", String(Date.now()));
+
+            var response = await fetch(requestUrl.toString(), { method: "GET" });
+            data = await response.json().catch(function () {
+              return null;
+            });
+            if (!response.ok || !data || data.ok === false) {
+              throw new Error((data && data.message) || "조회에 실패했습니다.");
+            }
+            if (!isIncompleteFloorResult(data)) break;
+          }
+
+          if (isIncompleteFloorResult(data)) {
+            throw new Error("층 면적과 호 목록을 받지 못했습니다. 잠시 후 다시 조회해주세요.");
           }
           writeAreaCache(cacheKey, data);
           return data;
@@ -3370,16 +3381,30 @@
             sessionStorage.removeItem(key);
             return null;
           }
-          return cached.data || null;
+          var data = cached.data || null;
+          if (isIncompleteFloorResult(data)) {
+            sessionStorage.removeItem(key);
+            return null;
+          }
+          return data;
         } catch (error) {
           return null;
         }
       }
 
       function writeAreaCache(key, data) {
+        if (isIncompleteFloorResult(data)) return;
         try {
           sessionStorage.setItem(key, JSON.stringify({ time: Date.now(), data: data }));
         } catch (error) {}
+      }
+
+      function isIncompleteFloorResult(data) {
+        if (!data || data.mode !== "floor") return false;
+        var hasFloorItems = Array.isArray(data.floor_items) && data.floor_items.length > 0;
+        var hasHoList = Array.isArray(data.ho_list) && data.ho_list.length > 0;
+        var hasFloorArea = Number(data.floor_exclusive_m2 || 0) > 0;
+        return !hasFloorItems && !hasHoList && !hasFloorArea;
       }
 
       function initEmbedMode() {
