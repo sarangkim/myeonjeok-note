@@ -1,6 +1,7 @@
-const BUILD = "2026-06-28-MYEONJEOK-NOTE-02";
+const BUILD = "2026-11-11-MYEONJEOK-NOTE-03";
 const BLD_PAGE_SIZE = 100;
 const MAX_PAGES = 100;
+const BLD_PAGE_CONCURRENCY = 2;
 const PYEONG_M2 = 3.305785;
 const BLD_FETCH_TIMEOUT_MS = 8000;
 const BLD_FETCH_RETRIES = 1;
@@ -270,36 +271,65 @@ async function fetchBldItems(apiName, keys) {
     return cached.items.map((item) => ({ ...item }));
   }
 
-  let allItems = [];
-  let pageNo = 1;
-  let totalCount = null;
+  const firstPage = await fetchBldPage(apiName, keys, 1);
+  let allItems = firstPage.items.slice();
+  const totalCount = firstPage.totalCount;
 
-  while (pageNo <= MAX_PAGES) {
-    const url = new URL(`https://apis.data.go.kr/1613000/BldRgstHubService/${apiName}`);
-    url.searchParams.set("sigunguCd", keys.sigunguCd);
-    url.searchParams.set("bjdongCd", keys.bjdongCd);
-    url.searchParams.set("bun", keys.bun);
-    url.searchParams.set("ji", keys.ji);
-    url.searchParams.set("numOfRows", String(BLD_PAGE_SIZE));
-    url.searchParams.set("pageNo", String(pageNo));
-
-    const response = await fetchWithRetry(withServiceKey(url, process.env.BLD_KEY), apiName);
-    if (!response.ok) throw new Error(`${apiName} HTTP 오류: ${response.status}`);
-
-    const text = await response.text();
-    const parsed = parseBldPayload(text, apiName);
-    const items = parsed.items;
-    allItems = allItems.concat(items);
-
-    if (totalCount === null) totalCount = parsed.totalCount || items.length;
-    if (!items.length) break;
-    if (totalCount > 0 && allItems.length >= totalCount) break;
-    if (!totalCount && items.length < BLD_PAGE_SIZE) break;
-    pageNo += 1;
+  if (totalCount > allItems.length) {
+    const totalPages = Math.min(MAX_PAGES, Math.ceil(totalCount / BLD_PAGE_SIZE));
+    const pageNos = Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) => index + 2);
+    const remainingPages = await mapWithConcurrency(
+      pageNos,
+      BLD_PAGE_CONCURRENCY,
+      (pageNo) => fetchBldPage(apiName, keys, pageNo)
+    );
+    remainingPages.forEach((page) => {
+      allItems = allItems.concat(page.items);
+    });
+  } else if (!totalCount && allItems.length >= BLD_PAGE_SIZE) {
+    let pageNo = 2;
+    while (pageNo <= MAX_PAGES) {
+      const page = await fetchBldPage(apiName, keys, pageNo);
+      allItems = allItems.concat(page.items);
+      if (!page.items.length || page.items.length < BLD_PAGE_SIZE) break;
+      pageNo += 1;
+    }
   }
 
   rememberBldItems(cacheKey, allItems);
   return allItems;
+}
+
+async function fetchBldPage(apiName, keys, pageNo) {
+  const url = new URL(`https://apis.data.go.kr/1613000/BldRgstHubService/${apiName}`);
+  url.searchParams.set("sigunguCd", keys.sigunguCd);
+  url.searchParams.set("bjdongCd", keys.bjdongCd);
+  url.searchParams.set("bun", keys.bun);
+  url.searchParams.set("ji", keys.ji);
+  url.searchParams.set("numOfRows", String(BLD_PAGE_SIZE));
+  url.searchParams.set("pageNo", String(pageNo));
+
+  const response = await fetchWithRetry(withServiceKey(url, process.env.BLD_KEY), apiName);
+  if (!response.ok) throw new Error(`${apiName} HTTP 오류: ${response.status}`);
+
+  return parseBldPayload(await response.text(), apiName);
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workerCount = Math.min(Math.max(1, limit), items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
 }
 
 function rememberBldItems(cacheKey, items) {
@@ -708,15 +738,20 @@ async function collectHoListForFloor(keys, floor) {
     }
   };
 
-  try {
-    const exposItems = await fetchBldItems("getBrExposInfo", keys);
+  const [exposResult, pubResult] = await Promise.allSettled([
+    fetchBldItems("getBrExposInfo", keys),
+    fetchBldItems("getBrExposPubuseAreaInfo", keys),
+  ]);
+
+  if (exposResult.status === "fulfilled") {
+    const exposItems = exposResult.value;
     exposItems.filter((it) => sameFloorItem(it, floor)).forEach((it) => addHo(it.hoNm, "exposInfo"));
-  } catch (e) {
-    hoNote += `exposInfo 실패: ${e.message} `;
+  } else {
+    hoNote += `exposInfo 실패: ${exposResult.reason?.message || exposResult.reason} `;
   }
 
-  try {
-    const pubItems = await fetchBldItems("getBrExposPubuseAreaInfo", keys);
+  if (pubResult.status === "fulfilled") {
+    const pubItems = pubResult.value;
     pubItems.filter((it) => sameFloorItem(it, floor)).forEach((it) => {
       addHo(it.hoNm, "pubuseArea");
       const raw = String(it.hoNm || "").trim();
@@ -732,8 +767,8 @@ async function collectHoListForFloor(keys, floor) {
         if (isSharedItem(it)) hoIndex[norm].shared_m2 += area;
       }
     });
-  } catch (e) {
-    hoNote += `pubuseArea 실패: ${e.message} `;
+  } else {
+    hoNote += `pubuseArea 실패: ${pubResult.reason?.message || pubResult.reason} `;
   }
 
   for (const v of Object.values(hoIndex)) {
